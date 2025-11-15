@@ -11,17 +11,26 @@ export default function EndToEndVerificationPage() {
 
   const generateReference = async () => {
     if (!voteId) {
-      alert('Please enter a vote ID');
+      setError('Please enter a vote ID');
       return;
     }
     setLoading(true);
     setError('');
     try {
       const result = await endToEndVerificationService.generateVoteReference(parseInt(voteId));
-      setReference(result.data);
-      alert('Reference code generated! Use this to verify your vote.');
+      if (result.data?.success && result.data?.data) {
+        setReference(result.data.data);
+        setError('');
+      } else if (result.data) {
+        setReference(result.data);
+        setError('');
+      } else {
+        setError('Failed to generate reference. Please check if the vote ID exists.');
+      }
     } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Failed to generate reference');
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to generate reference';
+      setError(errorMsg);
+      console.error('Generate reference error:', err);
     } finally {
       setLoading(false);
     }
@@ -29,21 +38,26 @@ export default function EndToEndVerificationPage() {
 
   const verifyReference = async () => {
     if (!referenceCode) {
-      alert('Please enter a reference code');
+      setError('Please enter a reference code');
       return;
     }
     setLoading(true);
     setError('');
     try {
       const result = await endToEndVerificationService.verifyVoteReference(referenceCode);
-      setVerification(result.data);
-      if (result.data.valid) {
-        alert('✅ Vote verified! Your vote was successfully recorded.');
+      if (result.data?.success && result.data?.data) {
+        setVerification(result.data.data);
+        setError('');
+      } else if (result.data) {
+        setVerification(result.data);
+        setError('');
       } else {
-        alert('❌ Verification failed. Please check your reference code.');
+        setError('Failed to verify reference. Please check your reference code.');
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || err.message || 'Failed to verify reference');
+      const errorMsg = err.response?.data?.error || err.response?.data?.message || err.message || 'Failed to verify reference';
+      setError(errorMsg);
+      console.error('Verify reference error:', err);
     } finally {
       setLoading(false);
     }
