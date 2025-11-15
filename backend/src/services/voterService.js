@@ -11,11 +11,11 @@ class VoterService {
         await connection.query('SET innodb_lock_wait_timeout = 10');
         await connection.beginTransaction();
 
-        // Check for duplicate email (normalized to lowercase) - use index-friendly query
+        // Check for duplicate email (only if email is provided and not empty)
         const normalizedEmail = voterData.email ? voterData.email.toLowerCase().trim() : null;
-        if (normalizedEmail) {
+        if (normalizedEmail && normalizedEmail.length > 0) {
           const [existingEmail] = await connection.query(
-            'SELECT voter_id, name, aadhaar_number FROM voters WHERE email = ? LIMIT 1',
+            'SELECT voter_id, name, aadhaar_number FROM voters WHERE email = ? AND email IS NOT NULL AND email != "" LIMIT 1',
             [normalizedEmail]
           );
           if (existingEmail.length > 0) {
@@ -25,28 +25,32 @@ class VoterService {
           }
         }
 
-        // Check for duplicate mobile - use index
-        if (voterData.mobile_number) {
+        // Check for duplicate mobile (only if mobile is provided and not empty)
+        const normalizedMobile = voterData.mobile_number ? voterData.mobile_number.trim() : null;
+        if (normalizedMobile && normalizedMobile.length > 0) {
           const [existingMobile] = await connection.query(
-            'SELECT voter_id, name, aadhaar_number FROM voters WHERE mobile_number = ? LIMIT 1',
-            [voterData.mobile_number]
+            'SELECT voter_id, name, aadhaar_number FROM voters WHERE mobile_number = ? AND mobile_number IS NOT NULL AND mobile_number != "" LIMIT 1',
+            [normalizedMobile]
           );
           if (existingMobile.length > 0) {
             await connection.rollback();
             connection.release();
-            throw new Error(`Mobile number ${voterData.mobile_number} is already registered with Voter ID: ${existingMobile[0].voter_id}, Name: ${existingMobile[0].name}, Aadhaar: ${existingMobile[0].aadhaar_number}`);
+            throw new Error(`Mobile number ${normalizedMobile} is already registered with Voter ID: ${existingMobile[0].voter_id}, Name: ${existingMobile[0].name}, Aadhaar: ${existingMobile[0].aadhaar_number}`);
           }
         }
 
-        // Check for duplicate Aadhaar - use unique index
-        const [existingAadhaar] = await connection.query(
-          'SELECT voter_id, name, email, mobile_number FROM voters WHERE aadhaar_number = ? LIMIT 1',
-          [voterData.aadhaar_number]
-        );
-        if (existingAadhaar.length > 0) {
-          await connection.rollback();
-          connection.release();
-          throw new Error(`Aadhaar number ${voterData.aadhaar_number} is already registered with Voter ID: ${existingAadhaar[0].voter_id}, Name: ${existingAadhaar[0].name}, Email: ${existingAadhaar[0].email}, Mobile: ${existingAadhaar[0].mobile_number}`);
+        // Check for duplicate Aadhaar (Aadhaar is always required, so always check)
+        if (voterData.aadhaar_number && voterData.aadhaar_number.trim().length > 0) {
+          const normalizedAadhaar = voterData.aadhaar_number.trim();
+          const [existingAadhaar] = await connection.query(
+            'SELECT voter_id, name, email, mobile_number FROM voters WHERE aadhaar_number = ? LIMIT 1',
+            [normalizedAadhaar]
+          );
+          if (existingAadhaar.length > 0) {
+            await connection.rollback();
+            connection.release();
+            throw new Error(`Aadhaar number ${normalizedAadhaar} is already registered with Voter ID: ${existingAadhaar[0].voter_id}, Name: ${existingAadhaar[0].name}, Email: ${existingAadhaar[0].email}, Mobile: ${existingAadhaar[0].mobile_number}`);
+          }
         }
 
         // Generate temporary hash if not provided (will be updated by biometric service)
@@ -73,11 +77,11 @@ class VoterService {
         const values = [
           voterData.name ? voterData.name.trim() : null,
           voterData.dob,
-          voterData.aadhaar_number,
+          voterData.aadhaar_number ? voterData.aadhaar_number.trim() : null,
           tempHash,
           voterData.is_verified || false,
-          normalizedEmail,
-          voterData.mobile_number,
+          normalizedEmail && normalizedEmail.length > 0 ? normalizedEmail : null,
+          normalizedMobile && normalizedMobile.length > 0 ? normalizedMobile : null,
           voterData.father_name ? voterData.father_name.trim() : null,
           normalizedGender,
           voterData.house_number ? voterData.house_number.trim() : null,
