@@ -114,21 +114,24 @@ class AuditLogService {
         action_type: data.action_type,
         entity_type: data.entity_type,
         timestamp: timestamp.toISOString(),
-        entity_id: data.entity_id || null,
-        actor_id: data.actor_id || null
+        entity_id: data.entity_id || null
       };
       
       const currentHash = generateHash(previousHash, logData, timestamp.toISOString());
       
+      // Map actor_id to voter_id if entity_type is 'voter', otherwise use entity_id
+      const voterId = (data.entity_type === 'voter' && data.actor_id) ? data.actor_id : 
+                      (data.entity_type === 'voter' && data.entity_id) ? data.entity_id : null;
+      
       await connection.query(
         `INSERT INTO audit_logs 
-         (action_type, entity_type, entity_id, actor_id, timestamp, previous_hash, current_hash, details) 
+         (action_type, entity_type, entity_id, voter_id, timestamp, previous_hash, current_hash, details) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           data.action_type,
           data.entity_type,
           data.entity_id || null,
-          data.actor_id || null,
+          voterId,
           timestamp,
           previousHash,
           currentHash,
