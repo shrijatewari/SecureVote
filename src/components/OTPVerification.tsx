@@ -25,6 +25,8 @@ export default function OTPVerification({ identifier, otpType, onVerify, onCance
     }
   }, [timer]);
 
+  const [testOTP, setTestOTP] = useState<string>('');
+
   const sendOTP = async () => {
     setSending(true);
     setError('');
@@ -38,9 +40,14 @@ export default function OTPVerification({ identifier, otpType, onVerify, onCance
         response = await otpService.sendMobile(identifier);
       }
       
+      // Store test OTP for display
+      const otpCode = response.data?.data?.otp_code || response.data?.otp_code;
+      if (otpCode) {
+        setTestOTP(otpCode);
+      }
+      
       setOtpSent(true);
       setTimer(60); // 60 second timer
-      alert(`OTP sent! (In production, check your ${otpType}). For testing, OTP: ${response.data.data.otp_code}`);
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to send OTP');
     } finally {
@@ -106,6 +113,15 @@ export default function OTPVerification({ identifier, otpType, onVerify, onCance
           </div>
         ) : (
           <div className="space-y-4">
+            {/* Test OTP Display */}
+            {testOTP && (
+              <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg p-4 text-white text-center">
+                <p className="text-sm font-medium mb-2">🧪 TEST MODE - Use this OTP:</p>
+                <p className="text-3xl font-bold tracking-widest font-mono">{testOTP}</p>
+                <p className="text-xs mt-2 opacity-90">In production, this would be sent to your {otpType}</p>
+              </div>
+            )}
+            
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Enter 6-digit OTP
@@ -119,6 +135,14 @@ export default function OTPVerification({ identifier, otpType, onVerify, onCance
                 maxLength={6}
                 autoFocus
               />
+              {testOTP && (
+                <button
+                  onClick={() => setOtp(testOTP)}
+                  className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  Click to auto-fill test OTP
+                </button>
+              )}
             </div>
 
             {timer > 0 && (

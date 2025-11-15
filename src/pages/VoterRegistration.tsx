@@ -40,6 +40,10 @@ export default function VoterRegistration() {
   const [mobileOTPSent, setMobileOTPSent] = useState(false);
   const [emailVerified, setEmailVerified] = useState(false);
   const [mobileVerified, setMobileVerified] = useState(false);
+  const [emailOTPCode, setEmailOTPCode] = useState<string>('');
+  const [mobileOTPCode, setMobileOTPCode] = useState<string>('');
+  const [emailOTPInput, setEmailOTPInput] = useState<string>('');
+  const [mobileOTPInput, setMobileOTPInput] = useState<string>('');
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -125,9 +129,12 @@ export default function VoterRegistration() {
 
     try {
       setLoading(true);
-      await otpService.sendEmail(formData.email);
+      const response = await otpService.sendEmail(formData.email);
+      const otpCode = response.data?.data?.otp_code || response.data?.otp_code;
+      if (otpCode) {
+        setEmailOTPCode(otpCode);
+      }
       setEmailOTPSent(true);
-      alert('OTP sent to your email. Please check your inbox.');
     } catch (err: any) {
       setError('Failed to send email OTP: ' + (err.response?.data?.error || err.message));
     } finally {
@@ -136,15 +143,23 @@ export default function VoterRegistration() {
   };
 
   const handleVerifyEmailOTP = async (otp: string) => {
+    if (!otp || otp.length !== 6) {
+      setError('Please enter a valid 6-digit OTP');
+      return;
+    }
     try {
       setLoading(true);
-      await otpService.verify(formData.email, 'email', otp);
-      setEmailVerified(true);
-      setStep('mobile-otp');
-      alert('Email verified successfully!');
+      const response = await otpService.verify(formData.email, 'email', otp);
+      if (response.data?.success || response.data?.data?.verified) {
+        setEmailVerified(true);
+        setStep('mobile-otp');
+        // Auto-send mobile OTP
+        setTimeout(() => handleSendMobileOTP(), 500);
+      } else {
+        setError('Invalid OTP. Please try again.');
+      }
     } catch (err: any) {
-      setError('Invalid OTP. Please try again.');
-      throw err;
+      setError(err.response?.data?.error || 'Invalid OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -159,9 +174,12 @@ export default function VoterRegistration() {
 
     try {
       setLoading(true);
-      await otpService.sendMobile(formData.mobile_number);
+      const response = await otpService.sendMobile(formData.mobile_number);
+      const otpCode = response.data?.data?.otp_code || response.data?.otp_code;
+      if (otpCode) {
+        setMobileOTPCode(otpCode);
+      }
       setMobileOTPSent(true);
-      alert('OTP sent to your mobile number. Please check your SMS.');
     } catch (err: any) {
       setError('Failed to send mobile OTP: ' + (err.response?.data?.error || err.message));
     } finally {
@@ -170,17 +188,23 @@ export default function VoterRegistration() {
   };
 
   const handleVerifyMobileOTP = async (otp: string) => {
+    if (!otp || otp.length !== 6) {
+      setError('Please enter a valid 6-digit OTP');
+      return;
+    }
     try {
       setLoading(true);
-      await otpService.verify(formData.mobile_number, 'mobile', otp);
-      setMobileVerified(true);
-      // Move to biometric step after successful mobile verification
-      setStep('biometric');
-      setShowBiometric(true);
-      // Don't alert here - let biometric component show naturally
+      const response = await otpService.verify(formData.mobile_number, 'mobile', otp);
+      if (response.data?.success || response.data?.data?.verified) {
+        setMobileVerified(true);
+        // Move to biometric step after successful mobile verification
+        setStep('biometric');
+        setShowBiometric(true);
+      } else {
+        setError('Invalid OTP. Please try again.');
+      }
     } catch (err: any) {
-      setError('Invalid OTP. Please try again.');
-      throw err;
+      setError(err.response?.data?.error || 'Invalid OTP. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -353,8 +377,18 @@ export default function VoterRegistration() {
               <h2 className="text-2xl font-bold text-gray-800">Step 2: Verify Email Address</h2>
               <span className="text-sm text-gray-500">2/4</span>
             </div>
-            <p className="text-gray-600 mb-2">We've sent an OTP to:</p>
+            <p className="text-gray-600 mb-2">Test OTP for:</p>
             <p className="text-lg font-semibold text-gray-800 mb-4">{formData.email}</p>
+            
+            {/* Test OTP Display */}
+            {emailOTPCode && (
+              <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg p-4 text-white text-center mb-4">
+                <p className="text-sm font-medium mb-2">🧪 TEST MODE - Use this OTP:</p>
+                <p className="text-4xl font-bold tracking-widest font-mono mb-2">{emailOTPCode}</p>
+                <p className="text-xs opacity-90">In production, this would be sent to your email</p>
+              </div>
+            )}
+            
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
               <p className="text-sm text-blue-800">
                 ✓ Step 1: Personal Details - Completed<br />
@@ -369,17 +403,73 @@ export default function VoterRegistration() {
               {error}
             </div>
           )}
-          <OTPVerification
-            onVerify={handleVerifyEmailOTP}
-            onResend={handleSendEmailOTP}
-            type="email"
-          />
+          {!emailOTPSent ? (
+            <button
+              onClick={handleSendEmailOTP}
+              disabled={loading}
+              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+            >
+              {loading ? 'Sending OTP...' : 'Send OTP'}
+            </button>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Enter 6-digit OTP
+                </label>
+                <input
+                  type="text"
+                  value={emailOTPInput}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                    setEmailOTPInput(value);
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-2xl tracking-widest font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="000000"
+                  maxLength={6}
+                  autoFocus
+                />
+                {emailOTPCode && (
+                  <button
+                    onClick={() => setEmailOTPInput(emailOTPCode)}
+                    className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Click to auto-fill test OTP: {emailOTPCode}
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setStep('details');
+                    setError('');
+                    setEmailOTPSent(false);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={() => {
+                    if (emailOTPInput) {
+                      handleVerifyEmailOTP(emailOTPInput);
+                    }
+                  }}
+                  disabled={loading || emailOTPInput.length !== 6}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {loading ? 'Verifying...' : 'Verify OTP'}
+                </button>
+              </div>
+            </div>
+          )}
           <button
             onClick={() => {
               setStep('details');
               setError('');
+              setEmailOTPSent(false);
             }}
-            className="mt-4 text-blue-600 hover:text-blue-800 font-medium"
+            className="mt-4 text-blue-600 hover:text-blue-800 font-medium w-full text-center"
           >
             ← Back to registration form
           </button>
@@ -398,8 +488,18 @@ export default function VoterRegistration() {
               <h2 className="text-2xl font-bold text-gray-800">Step 3: Verify Mobile Number</h2>
               <span className="text-sm text-gray-500">3/4</span>
             </div>
-            <p className="text-gray-600 mb-2">We've sent an OTP to:</p>
+            <p className="text-gray-600 mb-2">Test OTP for:</p>
             <p className="text-lg font-semibold text-gray-800 mb-4">+91 {formData.mobile_number}</p>
+            
+            {/* Test OTP Display */}
+            {mobileOTPCode && (
+              <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg p-4 text-white text-center mb-4">
+                <p className="text-sm font-medium mb-2">🧪 TEST MODE - Use this OTP:</p>
+                <p className="text-4xl font-bold tracking-widest font-mono mb-2">{mobileOTPCode}</p>
+                <p className="text-xs opacity-90">In production, this would be sent via SMS</p>
+              </div>
+            )}
+            
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
               <p className="text-sm text-blue-800">
                 ✓ Step 1: Personal Details - Completed<br />
@@ -414,17 +514,73 @@ export default function VoterRegistration() {
               {error}
             </div>
           )}
-          <OTPVerification
-            onVerify={handleVerifyMobileOTP}
-            onResend={handleSendMobileOTP}
-            type="mobile"
-          />
+          {!mobileOTPSent ? (
+            <button
+              onClick={handleSendMobileOTP}
+              disabled={loading}
+              className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+            >
+              {loading ? 'Sending OTP...' : 'Send OTP'}
+            </button>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Enter 6-digit OTP
+                </label>
+                <input
+                  type="text"
+                  value={mobileOTPInput}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, '').slice(0, 6);
+                    setMobileOTPInput(value);
+                  }}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-2xl tracking-widest font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="000000"
+                  maxLength={6}
+                  autoFocus
+                />
+                {mobileOTPCode && (
+                  <button
+                    onClick={() => setMobileOTPInput(mobileOTPCode)}
+                    className="mt-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Click to auto-fill test OTP: {mobileOTPCode}
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setStep('email-otp');
+                    setError('');
+                    setMobileOTPSent(false);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={() => {
+                    if (mobileOTPInput) {
+                      handleVerifyMobileOTP(mobileOTPInput);
+                    }
+                  }}
+                  disabled={loading || mobileOTPInput.length !== 6}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {loading ? 'Verifying...' : 'Verify OTP'}
+                </button>
+              </div>
+            </div>
+          )}
           <button
             onClick={() => {
               setStep('email-otp');
               setError('');
+              setMobileOTPSent(false);
             }}
-            className="mt-4 text-blue-600 hover:text-blue-800 font-medium"
+            className="mt-4 text-blue-600 hover:text-blue-800 font-medium w-full text-center"
           >
             ← Back to email verification
           </button>
