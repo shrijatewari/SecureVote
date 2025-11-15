@@ -6,14 +6,14 @@
 const express = require('express');
 const router = express.Router();
 const aiController = require('../controllers/aiController');
-const { authenticate } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 
 // All routes require authentication (except health check)
 router.use((req, res, next) => {
   if (req.path === '/health') {
     return next();
   }
-  authenticate(req, res, next);
+  authenticateToken(req, res, next);
 });
 
 /**
