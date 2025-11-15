@@ -18,7 +18,7 @@ class TransparencyService {
       
       // Get all audit logs for the date
       const [logs] = await connection.query(
-        `SELECT log_id, action_type, entity_type, entity_id, actor_id, timestamp, current_hash
+        `SELECT log_id, action_type, entity_type, entity_id, voter_id, timestamp, current_hash
          FROM audit_logs
          WHERE DATE(timestamp) = ?
          ORDER BY timestamp ASC`,
