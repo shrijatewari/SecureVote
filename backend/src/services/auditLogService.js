@@ -102,6 +102,48 @@ class AuditLogService {
       connection.release();
     }
   }
+
+  async logAction(data) {
+    const connection = await pool.getConnection();
+    try {
+      const { generateHash, getLastAuditHash } = require('../utils/hashChain');
+      const timestamp = new Date();
+      const previousHash = await getLastAuditHash(connection);
+      
+      const logData = {
+        action_type: data.action_type,
+        entity_type: data.entity_type,
+        timestamp: timestamp.toISOString(),
+        entity_id: data.entity_id || null,
+        actor_id: data.actor_id || null
+      };
+      
+      const currentHash = generateHash(previousHash, logData, timestamp.toISOString());
+      
+      await connection.query(
+        `INSERT INTO audit_logs 
+         (action_type, entity_type, entity_id, actor_id, timestamp, previous_hash, current_hash, details) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          data.action_type,
+          data.entity_type,
+          data.entity_id || null,
+          data.actor_id || null,
+          timestamp,
+          previousHash,
+          currentHash,
+          data.metadata || JSON.stringify({})
+        ]
+      );
+      
+      return { success: true, hash: currentHash };
+    } catch (error) {
+      console.error('Audit log error:', error);
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
 }
 
 module.exports = new AuditLogService();
