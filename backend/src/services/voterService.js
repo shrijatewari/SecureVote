@@ -133,6 +133,8 @@ class VoterService {
         const voterId = result.insertId;
         connection.release();
         
+        console.log('✅ Voter created successfully with ID:', voterId);
+        
         // Log audit event (outside transaction to avoid lock timeout)
         setImmediate(async () => {
           try {
@@ -178,6 +180,22 @@ class VoterService {
           connection.release();
         }
         
+        // Handle database UNIQUE constraint errors (from database level)
+        if (error.code === 'ER_DUP_ENTRY') {
+          console.error('Database duplicate entry error:', error.sqlMessage);
+          const sqlMessage = error.sqlMessage || '';
+          
+          if (sqlMessage.includes('aadhaar_number')) {
+            throw new Error(`Aadhaar number is already registered. Please use a different Aadhaar number.`);
+          } else if (sqlMessage.includes('email')) {
+            throw new Error(`Email is already registered. Please use a different email address.`);
+          } else if (sqlMessage.includes('mobile_number')) {
+            throw new Error(`Mobile number is already registered. Please use a different mobile number.`);
+          } else {
+            throw new Error(`Duplicate entry detected: This information is already registered in the system.`);
+          }
+        }
+        
         // Retry on deadlock or lock timeout
         if ((error.code === 'ER_LOCK_DEADLOCK' || error.code === 'ER_LOCK_WAIT_TIMEOUT') && retries > 1) {
           retries--;
@@ -186,6 +204,8 @@ class VoterService {
           await new Promise(resolve => setTimeout(resolve, backoffDelay));
           continue;
         }
+        
+        console.error('Voter creation error:', error.message, error.code);
         throw error;
       }
     }
