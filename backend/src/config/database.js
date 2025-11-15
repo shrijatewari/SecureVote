@@ -9,7 +9,10 @@ const dbConfig = {
   database: process.env.DB_NAME || 'voting_system',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  // Set default lock wait timeout
+  connectTimeout: 10000,
+  acquireTimeout: 10000
 };
 
 // Create connection pool

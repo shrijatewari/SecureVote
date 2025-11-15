@@ -7,143 +7,166 @@ class VoterService {
     while (retries > 0) {
       connection = await pool.getConnection();
       try {
+        // Set lock wait timeout to 10 seconds
+        await connection.query('SET innodb_lock_wait_timeout = 10');
         await connection.beginTransaction();
 
-      // Check for duplicate email (normalized to lowercase)
-      const normalizedEmail = voterData.email ? voterData.email.toLowerCase().trim() : null;
-      if (normalizedEmail) {
-        const [existingEmail] = await connection.query(
-          'SELECT voter_id, name, aadhaar_number FROM voters WHERE LOWER(TRIM(email)) = ?',
-          [normalizedEmail]
+        // Check for duplicate email (normalized to lowercase) - use index-friendly query
+        const normalizedEmail = voterData.email ? voterData.email.toLowerCase().trim() : null;
+        if (normalizedEmail) {
+          const [existingEmail] = await connection.query(
+            'SELECT voter_id, name, aadhaar_number FROM voters WHERE email = ? LIMIT 1',
+            [normalizedEmail]
+          );
+          if (existingEmail.length > 0) {
+            await connection.rollback();
+            connection.release();
+            throw new Error(`Email ${normalizedEmail} is already registered with Voter ID: ${existingEmail[0].voter_id}, Name: ${existingEmail[0].name}, Aadhaar: ${existingEmail[0].aadhaar_number}`);
+          }
+        }
+
+        // Check for duplicate mobile - use index
+        if (voterData.mobile_number) {
+          const [existingMobile] = await connection.query(
+            'SELECT voter_id, name, aadhaar_number FROM voters WHERE mobile_number = ? LIMIT 1',
+            [voterData.mobile_number]
+          );
+          if (existingMobile.length > 0) {
+            await connection.rollback();
+            connection.release();
+            throw new Error(`Mobile number ${voterData.mobile_number} is already registered with Voter ID: ${existingMobile[0].voter_id}, Name: ${existingMobile[0].name}, Aadhaar: ${existingMobile[0].aadhaar_number}`);
+          }
+        }
+
+        // Check for duplicate Aadhaar - use unique index
+        const [existingAadhaar] = await connection.query(
+          'SELECT voter_id, name, email, mobile_number FROM voters WHERE aadhaar_number = ? LIMIT 1',
+          [voterData.aadhaar_number]
         );
-        if (existingEmail.length > 0) {
+        if (existingAadhaar.length > 0) {
           await connection.rollback();
-          throw new Error(`Email ${normalizedEmail} is already registered with Voter ID: ${existingEmail[0].voter_id}, Name: ${existingEmail[0].name}, Aadhaar: ${existingEmail[0].aadhaar_number}`);
+          connection.release();
+          throw new Error(`Aadhaar number ${voterData.aadhaar_number} is already registered with Voter ID: ${existingAadhaar[0].voter_id}, Name: ${existingAadhaar[0].name}, Email: ${existingAadhaar[0].email}, Mobile: ${existingAadhaar[0].mobile_number}`);
         }
-      }
 
-      // Check for duplicate mobile
-      if (voterData.mobile_number) {
-        const [existingMobile] = await connection.query(
-          'SELECT voter_id, name, aadhaar_number FROM voters WHERE mobile_number = ?',
-          [voterData.mobile_number]
-        );
-        if (existingMobile.length > 0) {
-          await connection.rollback();
-          throw new Error(`Mobile number ${voterData.mobile_number} is already registered with Voter ID: ${existingMobile[0].voter_id}, Name: ${existingMobile[0].name}, Aadhaar: ${existingMobile[0].aadhaar_number}`);
+        // Generate temporary hash if not provided (will be updated by biometric service)
+        const crypto = require('crypto');
+        const tempHash = (voterData.biometric_hash && voterData.biometric_hash.length >= 32) 
+          ? voterData.biometric_hash 
+          : crypto.randomBytes(32).toString('hex');
+        
+        // Build dynamic query with mandatory fields
+        // normalizedEmail already declared above, just normalize gender
+        const normalizedGender = voterData.gender ? 
+          voterData.gender.charAt(0).toUpperCase() + voterData.gender.slice(1).toLowerCase() : null;
+        
+        const fields = [
+          'name', 'dob', 'aadhaar_number', 'biometric_hash', 'is_verified',
+          'email', 'mobile_number', 'father_name', 'gender',
+          'house_number', 'street', 'village_city', 'district', 'state', 'pin_code'
+        ];
+        const values = [
+          voterData.name ? voterData.name.trim() : null,
+          voterData.dob,
+          voterData.aadhaar_number,
+          tempHash,
+          voterData.is_verified || false,
+          normalizedEmail,
+          voterData.mobile_number,
+          voterData.father_name ? voterData.father_name.trim() : null,
+          normalizedGender,
+          voterData.house_number ? voterData.house_number.trim() : null,
+          voterData.street ? voterData.street.trim() : null,
+          voterData.village_city ? voterData.village_city.trim() : null,
+          voterData.district ? voterData.district.trim() : null,
+          voterData.state ? voterData.state.trim() : null,
+          voterData.pin_code
+        ];
+
+        // Add optional extended fields if provided
+        const optionalFields = [
+          'mother_name', 'guardian_name',
+          'is_indian_citizen', 'family_head_id'
+        ];
+
+        optionalFields.forEach(field => {
+          if (voterData[field] !== undefined && voterData[field] !== null) {
+            fields.push(field);
+            values.push(voterData[field]);
+          }
+        });
+
+        // Email and mobile verification status (will be set after OTP verification)
+        if (voterData.email_verified !== undefined) {
+          fields.push('email_verified');
+          values.push(voterData.email_verified || false);
         }
-      }
 
-      // Check for duplicate Aadhaar (already checked by UNIQUE constraint, but provide better error)
-      const [existingAadhaar] = await connection.query(
-        'SELECT voter_id, name, email, mobile_number FROM voters WHERE aadhaar_number = ?',
-        [voterData.aadhaar_number]
-      );
-      if (existingAadhaar.length > 0) {
-        await connection.rollback();
-        throw new Error(`Aadhaar number ${voterData.aadhaar_number} is already registered with Voter ID: ${existingAadhaar[0].voter_id}, Name: ${existingAadhaar[0].name}, Email: ${existingAadhaar[0].email}, Mobile: ${existingAadhaar[0].mobile_number}`);
-      }
-
-      // Generate temporary hash if not provided (will be updated by biometric service)
-      const crypto = require('crypto');
-      const tempHash = (voterData.biometric_hash && voterData.biometric_hash.length >= 32) 
-        ? voterData.biometric_hash 
-        : crypto.randomBytes(32).toString('hex');
-      
-      // Build dynamic query with mandatory fields
-      // normalizedEmail already declared above, just normalize gender
-      const normalizedGender = voterData.gender ? 
-        voterData.gender.charAt(0).toUpperCase() + voterData.gender.slice(1).toLowerCase() : null;
-      
-      const fields = [
-        'name', 'dob', 'aadhaar_number', 'biometric_hash', 'is_verified',
-        'email', 'mobile_number', 'father_name', 'gender',
-        'house_number', 'street', 'village_city', 'district', 'state', 'pin_code'
-      ];
-      const values = [
-        voterData.name ? voterData.name.trim() : null,
-        voterData.dob,
-        voterData.aadhaar_number,
-        tempHash,
-        voterData.is_verified || false,
-        normalizedEmail,
-        voterData.mobile_number,
-        voterData.father_name ? voterData.father_name.trim() : null,
-        normalizedGender,
-        voterData.house_number ? voterData.house_number.trim() : null,
-        voterData.street ? voterData.street.trim() : null,
-        voterData.village_city ? voterData.village_city.trim() : null,
-        voterData.district ? voterData.district.trim() : null,
-        voterData.state ? voterData.state.trim() : null,
-        voterData.pin_code
-      ];
-
-      // Add optional extended fields if provided
-      const optionalFields = [
-        'mother_name', 'guardian_name',
-        'is_indian_citizen', 'family_head_id'
-      ];
-
-      optionalFields.forEach(field => {
-        if (voterData[field] !== undefined && voterData[field] !== null) {
-          fields.push(field);
-          values.push(voterData[field]);
+        if (voterData.mobile_verified !== undefined) {
+          fields.push('mobile_verified');
+          values.push(voterData.mobile_verified || false);
         }
-      });
 
-      // Email and mobile verification status (will be set after OTP verification)
-      if (voterData.email_verified !== undefined) {
-        fields.push('email_verified');
-        values.push(voterData.email_verified || false);
-      }
-
-      if (voterData.mobile_verified !== undefined) {
-        fields.push('mobile_verified');
-        values.push(voterData.mobile_verified || false);
-      }
-
-      const placeholders = fields.map(() => '?').join(', ');
-      const query = `INSERT INTO voters (${fields.join(', ')}) VALUES (${placeholders})`;
-      
-      const [result] = await connection.query(query, values);
-      
-      // Log audit event
-      const auditService = require('./auditLogService');
-      await auditService.logAction({
-        action_type: 'voter_registered',
-        entity_type: 'voter',
-        entity_id: result.insertId,
-        actor_id: result.insertId,
-        metadata: JSON.stringify({
-          name: voterData.name,
-          aadhaar: voterData.aadhaar_number,
-          email: voterData.email,
-          mobile: voterData.mobile_number
-        })
-      });
-      
-      // Create application if voter created successfully
-      if (result.insertId) {
-        try {
-          const applicationService = require('./applicationService');
-          await applicationService.createApplication(result.insertId);
-        } catch (err) {
-          console.warn('Application creation failed:', err.message);
-        }
-      }
-      
+        const placeholders = fields.map(() => '?').join(', ');
+        const query = `INSERT INTO voters (${fields.join(', ')}) VALUES (${placeholders})`;
+        
+        const [result] = await connection.query(query, values);
+        
         await connection.commit();
-        const voter = await this.getVoterById(result.insertId);
-        connection.release();
-        return voter;
-      } catch (error) {
-        await connection.rollback();
+        const voterId = result.insertId;
         connection.release();
         
-        // Retry on deadlock
-        if (error.code === 'ER_LOCK_DEADLOCK' && retries > 1) {
+        // Log audit event (outside transaction to avoid lock timeout)
+        setImmediate(async () => {
+          try {
+            const auditService = require('./auditLogService');
+            await auditService.logAction({
+              action_type: 'voter_registered',
+              entity_type: 'voter',
+              entity_id: voterId,
+              actor_id: voterId,
+              metadata: JSON.stringify({
+                name: voterData.name,
+                aadhaar: voterData.aadhaar_number,
+                email: voterData.email,
+                mobile: voterData.mobile_number
+              })
+            });
+          } catch (err) {
+            console.warn('Audit log failed:', err.message);
+          }
+        });
+        
+        // Create application if voter created successfully (outside transaction)
+        if (voterId) {
+          setImmediate(async () => {
+            try {
+              const applicationService = require('./applicationService');
+              await applicationService.createApplication(voterId);
+            } catch (err) {
+              console.warn('Application creation failed:', err.message);
+            }
+          });
+        }
+        
+        const voter = await this.getVoterById(voterId);
+        return voter;
+      } catch (error) {
+        if (connection) {
+          try {
+            await connection.rollback();
+          } catch (rollbackErr) {
+            console.error('Rollback error:', rollbackErr.message);
+          }
+          connection.release();
+        }
+        
+        // Retry on deadlock or lock timeout
+        if ((error.code === 'ER_LOCK_DEADLOCK' || error.code === 'ER_LOCK_WAIT_TIMEOUT') && retries > 1) {
           retries--;
-          await new Promise(resolve => setTimeout(resolve, 50 * (4 - retries))); // Exponential backoff
+          const backoffDelay = 100 * (4 - retries); // Exponential backoff: 100ms, 200ms, 300ms
+          console.warn(`Lock error (${error.code}), retrying in ${backoffDelay}ms... (${retries} retries left)`);
+          await new Promise(resolve => setTimeout(resolve, backoffDelay));
           continue;
         }
         throw error;
