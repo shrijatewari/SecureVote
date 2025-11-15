@@ -2,9 +2,12 @@ const pool = require('../config/database');
 
 class VoterService {
   async createVoter(voterData) {
-    const connection = await pool.getConnection();
-    try {
-      await connection.beginTransaction();
+    let connection;
+    let retries = 3;
+    while (retries > 0) {
+      connection = await pool.getConnection();
+      try {
+        await connection.beginTransaction();
 
       // Check for duplicate email (normalized to lowercase)
       const normalizedEmail = voterData.email ? voterData.email.toLowerCase().trim() : null;
@@ -129,14 +132,24 @@ class VoterService {
         }
       }
       
-      await connection.commit();
-      return await this.getVoterById(result.insertId);
-    } catch (error) {
-      await connection.rollback();
-      throw error;
-    } finally {
-      connection.release();
+        await connection.commit();
+        const voter = await this.getVoterById(result.insertId);
+        connection.release();
+        return voter;
+      } catch (error) {
+        await connection.rollback();
+        connection.release();
+        
+        // Retry on deadlock
+        if (error.code === 'ER_LOCK_DEADLOCK' && retries > 1) {
+          retries--;
+          await new Promise(resolve => setTimeout(resolve, 50 * (4 - retries))); // Exponential backoff
+          continue;
+        }
+        throw error;
+      }
     }
+    throw new Error('Failed to create voter after retries');
   }
 
   async getVoterById(voterId) {
