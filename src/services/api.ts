@@ -149,14 +149,21 @@ export const epicService = {
 
 // Profile
 export const profileService = {
-  getProfile: (voterId?: number) => api.get(`/profile/${voterId || ''}`),
+  getProfile: (voterId?: number) => {
+    // If no voterId provided, get from current user or use empty string (backend will get from token)
+    const id = voterId ? `/${voterId}` : '';
+    return api.get(`/profile${id}`);
+  },
   updateProfile: (voterId: number, data: any) => {
     if (!voterId) {
       return Promise.reject(new Error('Voter ID is required'));
     }
     return api.put(`/profile/${voterId}`, data);
   },
-  getCompletionStatus: (voterId?: number) => api.get(`/profile/${voterId || ''}/completion`),
+  getCompletionStatus: (voterId?: number) => {
+    const id = voterId ? `/${voterId}` : '';
+    return api.get(`/profile${id}/completion`);
+  },
   verifyContact: (voterId: number, type: string, verified: boolean) => 
     api.post(`/profile/${voterId}/verify-contact`, { type, verified }),
   addFamilyRelation: (voterId: number, data: any) => 

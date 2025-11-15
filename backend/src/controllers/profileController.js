@@ -2,13 +2,27 @@ const profileService = require('../services/profileService');
 
 async function getProfile(req, res, next) {
   try {
-    const voterId = parseInt(req.params.id || req.user?.voter_id);
-    if (!voterId) {
-      return res.status(400).json({ error: 'Voter ID required' });
+    // Get voter ID from params, user token, or request body
+    let voterId = null;
+    if (req.params.id && req.params.id !== '') {
+      voterId = parseInt(req.params.id);
+    } else if (req.user?.voter_id) {
+      voterId = parseInt(req.user.voter_id);
+    } else if (req.user?.id) {
+      voterId = parseInt(req.user.id);
     }
+    
+    if (!voterId || isNaN(voterId)) {
+      return res.status(401).json({ error: 'Invalid or expired token. Please log in again.' });
+    }
+    
     const profile = await profileService.getProfile(voterId);
+    if (!profile) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
     res.json({ success: true, data: profile });
   } catch (error) {
+    console.error('Get profile error:', error);
     next(error);
   }
 }
@@ -37,13 +51,24 @@ async function updateProfile(req, res, next) {
 
 async function getCompletionStatus(req, res, next) {
   try {
-    const voterId = parseInt(req.params.id || req.user?.voter_id);
-    if (!voterId) {
-      return res.status(400).json({ error: 'Voter ID required' });
+    // Get voter ID from params, user token, or request body
+    let voterId = null;
+    if (req.params.id && req.params.id !== '') {
+      voterId = parseInt(req.params.id);
+    } else if (req.user?.voter_id) {
+      voterId = parseInt(req.user.voter_id);
+    } else if (req.user?.id) {
+      voterId = parseInt(req.user.id);
     }
+    
+    if (!voterId || isNaN(voterId)) {
+      return res.status(401).json({ error: 'Invalid or expired token. Please log in again.' });
+    }
+    
     const status = await profileService.getCompletionStatus(voterId);
     res.json({ success: true, data: status });
   } catch (error) {
+    console.error('Get completion status error:', error);
     next(error);
   }
 }

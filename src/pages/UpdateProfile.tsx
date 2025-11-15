@@ -54,6 +54,14 @@ export default function UpdateProfile() {
 
   const loadProfile = async () => {
     try {
+      // Check if user is logged in
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        alert('Please log in to access your profile.');
+        window.location.href = '/login';
+        return;
+      }
+
       const [profileRes, completionRes] = await Promise.all([
         profileService.getProfile(),
         profileService.getCompletionStatus()
@@ -62,20 +70,36 @@ export default function UpdateProfile() {
       console.log('Profile loaded:', profileRes.data);
       console.log('Completion status:', completionRes.data);
       
-      if (profileRes.data.success && profileRes.data.data) {
+      if (profileRes.data?.success && profileRes.data?.data) {
         setProfile(profileRes.data.data);
         setFormData(profileRes.data.data);
       } else {
         console.error('Profile data not found:', profileRes.data);
-        alert('Failed to load profile. Please try logging in again.');
+        const errorMsg = profileRes.data?.error || 'Failed to load profile. Please try logging in again.';
+        alert(errorMsg);
+        if (errorMsg.includes('token') || errorMsg.includes('expired')) {
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user_data');
+          window.location.href = '/login';
+        }
       }
       
-      if (completionRes.data.success && completionRes.data.data) {
+      if (completionRes.data?.success && completionRes.data?.data) {
         setCompletion(completionRes.data.data);
       }
     } catch (error: any) {
       console.error('Failed to load profile:', error);
       const errorMsg = error.response?.data?.error || error.message || 'Failed to load profile';
+      
+      // Handle token expiration
+      if (errorMsg.includes('token') || errorMsg.includes('expired') || error.response?.status === 401) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_data');
+        alert('Your session has expired. Please log in again.');
+        window.location.href = '/login';
+        return;
+      }
+      
       alert(`Error loading profile: ${errorMsg}`);
     } finally {
       setLoading(false);
