@@ -11,8 +11,12 @@ const { authenticateToken } = require('../middleware/auth');
 /**
  * GET /ai/health
  * Health check for all AI services (PUBLIC - no auth required)
+ * This endpoint ignores any authentication tokens sent
  */
-router.get('/health', aiController.healthCheck.bind(aiController));
+router.get('/health', (req, res, next) => {
+  // Explicitly skip authentication for health check
+  aiController.healthCheck(req, res, next);
+});
 
 // All other routes require authentication
 router.use(authenticateToken);
