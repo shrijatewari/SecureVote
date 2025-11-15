@@ -29,8 +29,12 @@ function authenticateToken(req, res, next) {
  * @returns {string} JWT token
  */
 function generateToken(payload) {
+  // Default to 7 days (168 hours) for longer sessions
+  // Can be set via JWT_EXPIRES_IN env variable
+  // Examples: '24h', '7d', '30d', '365d', '9999d' (for development)
+  const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
   return jwt.sign(payload, process.env.JWT_SECRET || 'default_secret', {
-    expiresIn: process.env.JWT_EXPIRES_IN || '24h'
+    expiresIn: expiresIn
   });
 }
 
