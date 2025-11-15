@@ -31,6 +31,7 @@ import EndToEndVerificationPage from './pages/EndToEndVerificationPage';
 import VoterManagement from './pages/admin/VoterManagement';
 import RollRevision from './pages/admin/RollRevision';
 import AIServicesDashboard from './pages/admin/AIServicesDashboard';
+import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
 function App() {
@@ -110,7 +111,11 @@ function App() {
         
         <Route
           path="/register"
-          element={<VoterRegistration />}
+          element={
+            <ErrorBoundary>
+              <VoterRegistration />
+            </ErrorBoundary>
+          }
         />
         
         <Route

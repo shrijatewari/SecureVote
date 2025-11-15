@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import BiometricCapture from '../components/BiometricCapture';
@@ -8,6 +8,14 @@ import LanguageSelector from '../components/LanguageSelector';
 
 export default function VoterRegistration() {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
+  
+  // Ensure i18n is ready
+  useEffect(() => {
+    if (!i18n.isInitialized) {
+      i18n.init();
+    }
+  }, [i18n]);
   const [step, setStep] = useState<'details' | 'email-otp' | 'mobile-otp' | 'biometric'>('details');
   const [showBiometric, setShowBiometric] = useState(false);
   const [formData, setFormData] = useState({
@@ -427,6 +435,11 @@ export default function VoterRegistration() {
 
   const { t } = useTranslation();
 
+  // Add error boundary check
+  if (!t) {
+    console.error('Translation function not available');
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
       <div className="max-w-4xl mx-auto">
@@ -434,12 +447,12 @@ export default function VoterRegistration() {
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center space-x-4">
-                <h1 className="text-3xl font-bold text-gray-800">{t('register')}</h1>
+                <h1 className="text-3xl font-bold text-gray-800">{t?.('register') || 'Voter Registration'}</h1>
                 <LanguageSelector compact={true} showLabel={false} />
               </div>
-              <span className="text-sm text-gray-500">{t('step')} 1/4</span>
+              <span className="text-sm text-gray-500">{t?.('step') || 'Step'} 1/4</span>
             </div>
-            <p className="text-gray-600 mb-4">{t('register')}</p>
+            <p className="text-gray-600 mb-4">Complete your voter registration in 4 simple steps</p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-sm text-blue-800">
                 ⏳ Step 1: Personal Details - In Progress<br />
