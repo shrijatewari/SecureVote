@@ -281,9 +281,9 @@ export const ledgerService = {
 
 // End-to-End Verification
 export const endToEndVerificationService = {
-  generateVoteReference: (voteId: number) => api.post(`/votes/${voteId}/reference`),
-  verifyVoteReference: (referenceCode: string) => api.get(`/votes/verify/${referenceCode}`),
-  generateElectionProof: (electionId: number) => api.get(`/votes/election/${electionId}/proof`),
+  generateVoteReference: (voteId: number) => api.post(`/end-to-end/votes/${voteId}/reference`),
+  verifyVoteReference: (referenceCode: string) => api.get(`/end-to-end/votes/verify/${referenceCode}`),
+  generateElectionProof: (electionId: number) => api.get(`/end-to-end/votes/election/${electionId}/proof`),
 };
 
 // AI Services
