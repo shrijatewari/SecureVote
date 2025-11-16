@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const validationController = require('../controllers/validationController');
+const notificationController = require('../controllers/notificationController');
 const { authenticateToken } = require('../middleware/auth');
 const { requirePermission, requireMinimumRole } = require('../middleware/rbac');
 
@@ -56,6 +57,12 @@ router.get('/review-tasks/statistics',
   authenticateToken,
   requirePermission('review.view'),
   validationController.getReviewTaskStatistics
+);
+
+// Notifications endpoint
+router.get('/notifications',
+  authenticateToken,
+  notificationController.getNotifications
 );
 
 module.exports = router;

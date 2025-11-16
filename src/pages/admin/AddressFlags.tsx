@@ -236,6 +236,12 @@ export default function AddressFlags() {
               {selectedFlag.district && (
                 <p><strong>Location:</strong> {selectedFlag.district}, {selectedFlag.state}</p>
               )}
+              {selectedFlag.ai_explanation && (
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm font-medium text-blue-900 mb-1">🤖 AI Explanation:</p>
+                  <p className="text-sm text-blue-800">{selectedFlag.ai_explanation}</p>
+                </div>
+              )}
             </div>
 
             <div className="mb-4">

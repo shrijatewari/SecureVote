@@ -211,6 +211,10 @@ ensureUsersSeeded().catch(err => {
 const addressClusterWorker = require('./workers/addressClusterWorker');
 addressClusterWorker.start();
 
+// Start notification service
+const notificationService = require('./services/notificationService');
+notificationService.startPolling(30); // Check every 30 seconds
+
 // Start server
 const server = app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);

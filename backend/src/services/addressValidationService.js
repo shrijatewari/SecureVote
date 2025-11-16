@@ -96,11 +96,89 @@ class AddressValidationService {
   }
 
   /**
-   * Mock geocoding - in production use Google Maps, Mapbox, or Nominatim
+   * Geocode address using Google Maps API with Mapbox fallback
    */
   async geocodeAddress(normalizedAddress, state, district, pinCode) {
-    // Mock geocoding - returns random coordinates within India bounds
-    // In production, integrate with actual geocoding service
+    const axios = require('axios');
+    
+    // Try Google Maps Geocoding API first
+    if (process.env.GOOGLE_MAPS_API_KEY) {
+      try {
+        const googleUrl = 'https://maps.googleapis.com/maps/api/geocode/json';
+        const addressQuery = `${normalizedAddress}, ${district}, ${state}, India ${pinCode || ''}`.trim();
+        
+        const response = await axios.get(googleUrl, {
+          params: {
+            address: addressQuery,
+            key: process.env.GOOGLE_MAPS_API_KEY,
+            region: 'in'
+          },
+          timeout: 5000
+        });
+
+        if (response.data.status === 'OK' && response.data.results.length > 0) {
+          const result = response.data.results[0];
+          const location = result.geometry.location;
+          
+          // Verify location is in India
+          const isInIndia = location.lat >= 6.5 && location.lat <= 37.1 && 
+                           location.lng >= 68.1 && location.lng <= 97.4;
+          
+          if (isInIndia) {
+            return {
+              latitude: parseFloat(location.lat.toFixed(8)),
+              longitude: parseFloat(location.lng.toFixed(8)),
+              confidence: result.geometry.location_type === 'ROOFTOP' ? 0.95 : 
+                         result.geometry.location_type === 'RANGE_INTERPOLATED' ? 0.85 : 0.75,
+              provider: 'google_maps',
+              formatted_address: result.formatted_address
+            };
+          }
+        }
+      } catch (error) {
+        console.warn('Google Maps geocoding failed, trying Mapbox:', error.message);
+      }
+    }
+
+    // Fallback to Mapbox Geocoding API
+    if (process.env.MAPBOX_ACCESS_TOKEN) {
+      try {
+        const mapboxUrl = 'https://api.mapbox.com/geocoding/v5/mapbox.places';
+        const addressQuery = encodeURIComponent(`${normalizedAddress}, ${district}, ${state}, India ${pinCode || ''}`.trim());
+        
+        const response = await axios.get(`${mapboxUrl}/${addressQuery}.json`, {
+          params: {
+            access_token: process.env.MAPBOX_ACCESS_TOKEN,
+            country: 'in',
+            limit: 1
+          },
+          timeout: 5000
+        });
+
+        if (response.data.features && response.data.features.length > 0) {
+          const feature = response.data.features[0];
+          const [longitude, latitude] = feature.center;
+          
+          // Verify location is in India
+          const isInIndia = latitude >= 6.5 && latitude <= 37.1 && 
+                           longitude >= 68.1 && longitude <= 97.4;
+          
+          if (isInIndia) {
+            return {
+              latitude: parseFloat(latitude.toFixed(8)),
+              longitude: parseFloat(longitude.toFixed(8)),
+              confidence: feature.relevance || 0.8,
+              provider: 'mapbox',
+              formatted_address: feature.place_name
+            };
+          }
+        }
+      } catch (error) {
+        console.warn('Mapbox geocoding failed, using fallback:', error.message);
+      }
+    }
+
+    // Fallback to deterministic mock geocoding
     const indiaBounds = {
       minLat: 6.5,
       maxLat: 37.1,
@@ -108,7 +186,6 @@ class AddressValidationService {
       maxLng: 97.4
     };
 
-    // Generate deterministic coordinates based on address hash
     const hash = this.generateAddressHash(normalizedAddress);
     const seed = parseInt(hash.substring(0, 8), 16);
     
@@ -117,17 +194,15 @@ class AddressValidationService {
     const longitude = indiaBounds.minLng + 
       ((seed * 7) % 1000000) / 1000000 * (indiaBounds.maxLng - indiaBounds.minLng);
 
-    // Confidence based on completeness
-    let confidence = 0.8;
-    if (!normalizedAddress.includes(',')) confidence = 0.3;
-    if (normalizedAddress.split(',').length < 3) confidence = 0.5;
-    if (pinCode && pinCode.length === 6) confidence = Math.min(confidence + 0.1, 0.95);
+    let confidence = 0.6; // Lower confidence for mock
+    if (normalizedAddress.includes(',') && normalizedAddress.split(',').length >= 3) confidence = 0.7;
+    if (pinCode && pinCode.length === 6) confidence = Math.min(confidence + 0.1, 0.75);
 
     return {
       latitude: parseFloat(latitude.toFixed(8)),
       longitude: parseFloat(longitude.toFixed(8)),
       confidence: parseFloat(confidence.toFixed(2)),
-      provider: 'mock'
+      provider: 'fallback'
     };
   }
 

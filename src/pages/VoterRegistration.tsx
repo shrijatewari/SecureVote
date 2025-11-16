@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import BiometricCapture from '../components/BiometricCapture';
 import OTPVerification from '../components/OTPVerification';
+import AddressAutocomplete from '../components/AddressAutocomplete';
 import { voterService, biometricService, otpService } from '../services/api';
 import LanguageSelector from '../components/LanguageSelector';
 
@@ -888,6 +889,24 @@ export default function VoterRegistration() {
             {/* Address Details Section */}
             <div className="border-b border-gray-200 pb-6">
               <h2 className="text-xl font-semibold text-gray-800 mb-4">Address Details</h2>
+              
+              {/* Google Places Autocomplete */}
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <AddressAutocomplete
+                  onAddressSelect={(address) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      house_number: address.house_number || prev.house_number,
+                      street: address.street || prev.street,
+                      village_city: address.village_city || prev.village_city,
+                      district: address.district || prev.district,
+                      state: address.state || prev.state,
+                      pin_code: address.pin_code || prev.pin_code,
+                    }));
+                  }}
+                />
+              </div>
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">

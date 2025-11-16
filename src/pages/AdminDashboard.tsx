@@ -5,6 +5,7 @@ import {
   adminService
 } from '../services/api';
 import LanguageSelector from '../components/LanguageSelector';
+import NotificationBell from '../components/NotificationBell';
 import { 
   BarChart, 
   Bar, 
@@ -437,6 +438,7 @@ export default function AdminDashboard() {
               <p className="text-sm text-gray-600">Monitor and manage all election operations</p>
             </div>
             <div className="flex items-center space-x-4">
+              <NotificationBell />
               <div className="text-right">
                 <p className="text-sm text-gray-600">Last Updated</p>
                 <p className="text-xs text-gray-500">{new Date().toLocaleTimeString()}</p>

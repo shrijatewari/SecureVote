@@ -3,6 +3,7 @@ const nameValidationService = require('../services/nameValidationService');
 const addressAnomalyService = require('../services/addressAnomalyDetectionService');
 const reviewTaskService = require('../services/reviewTaskService');
 const auditLogService = require('../services/auditLogService');
+const openAIService = require('../services/openAIService');
 
 /**
  * Validate address
@@ -95,9 +96,33 @@ async function getAddressFlags(req, res, next) {
     
     const flags = await addressAnomalyService.getAddressFlags(filters);
     
+    // Add AI-generated explanations for each flag
+    const flagsWithExplanations = await Promise.all(
+      flags.map(async (flag) => {
+        try {
+          const explanation = await openAIService.generateAddressClusterExplanation({
+            voter_count: flag.voter_count,
+            risk_score: flag.risk_score,
+            risk_level: flag.risk_level,
+            surname_diversity_score: flag.surname_diversity_score || 1.0,
+            dob_clustering_score: flag.dob_clustering_score || 1.0,
+            district: flag.district,
+            state: flag.state
+          });
+          return {
+            ...flag,
+            ai_explanation: explanation
+          };
+        } catch (e) {
+          console.warn('Failed to generate AI explanation for flag:', flag.id, e.message);
+          return flag;
+        }
+      })
+    );
+    
     res.json({
       success: true,
-      data: flags
+      data: flagsWithExplanations
     });
   } catch (error) {
     console.error('Get address flags error:', error);
@@ -169,9 +194,33 @@ async function getReviewTasks(req, res, next) {
     
     const tasks = await reviewTaskService.getTasks(filters);
     
+    // Add AI-generated explanations for name validation tasks
+    const tasksWithExplanations = await Promise.all(
+      tasks.map(async (task) => {
+        if (task.task_type === 'name_verification' && task.validation_scores) {
+          try {
+            const nameScores = task.validation_scores;
+            const explanation = await openAIService.generateNameValidationExplanation({
+              qualityScore: nameScores.father_name || nameScores.mother_name || nameScores.guardian_name || 0.5,
+              validationResult: task.flags?.includes('low_quality') ? 'rejected' : 'flagged',
+              flags: task.flags || []
+            });
+            return {
+              ...task,
+              ai_explanation: explanation
+            };
+          } catch (e) {
+            console.warn('Failed to generate AI explanation for task:', task.task_id, e.message);
+            return task;
+          }
+        }
+        return task;
+      })
+    );
+    
     res.json({
       success: true,
-      data: tasks
+      data: tasksWithExplanations
     });
   } catch (error) {
     console.error('Get review tasks error:', error);

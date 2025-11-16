@@ -189,6 +189,14 @@ const validationService = {
     const params = assignedTo ? `?assigned_to=${assignedTo}` : '';
     const response = await api.get(`/validate/review-tasks/statistics${params}`);
     return response.data.data;
+  },
+
+  /**
+   * Get notifications
+   */
+  async getNotifications(): Promise<any[]> {
+    const response = await api.get('/validate/notifications');
+    return response.data.data || [];
   }
 };
 
