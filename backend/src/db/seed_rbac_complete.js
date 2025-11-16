@@ -125,54 +125,181 @@ async function seedRBAC() {
 
     console.log(`✅ Inserted ${permissions.length} permissions\n`);
 
-    // 3. Assign Permissions to Roles
+    // 3. Assign Permissions to Roles (EXACT MATRIX FROM USER REQUIREMENTS)
     const rolePermissions = {
-      SUPERADMIN: Object.keys(permissionMap), // All permissions
+      SUPERADMIN: Object.keys(permissionMap), // All permissions - root access
+      
       CEO: [
-        'dashboard.view', 'voters.view', 'voters.edit', 'voters.approve', 'voters.assign_blo',
+        // Dashboard
+        'dashboard.view',
+        // AI Services - can view AND modify
+        'ai.view_logs', 'ai.change_thresholds', 'ai.retrain',
+        // Voter Management - full access
+        'voters.view', 'voters.edit', 'voters.approve', 'voters.assign_blo',
+        // Roll Revision - can commit (highest risk)
         'revision.view_flags', 'revision.approve_flags', 'revision.dry_run', 'revision.commit',
-        'duplicates.view', 'duplicates.resolve', 'death_records.upload', 'death_records.approve', 'death_records.view',
-        'blo_tasks.view', 'blo_tasks.assign', 'documents.approve', 'documents.view_ocr',
-        'ai.view_logs', 'ai.change_thresholds', 'ai.retrain', 'grievances.view', 'grievances.manage',
-        'epic.view', 'epic.generate', 'biometric.view', 'biometric.approve', 'biometric.compare',
-        'security.view', 'security.manage', 'settings.view', 'settings.manage'
+        // Duplicate Detection - can split accidental merges
+        'duplicates.view', 'duplicates.resolve',
+        // Death Records - can upload CSV
+        'death_records.upload', 'death_records.approve', 'death_records.view',
+        // BLO Tasks - can assign
+        'blo_tasks.view', 'blo_tasks.assign',
+        // Grievances - full access
+        'grievances.view', 'grievances.manage',
+        // Address Analytics
+        'voters.view', // For address clusters
+        // Document Verification
+        'documents.view_ocr', 'documents.approve',
+        // Biometric Operations
+        'biometric.view', 'biometric.approve', 'biometric.compare',
+        // Official Communications - can publish with signature
+        'voters.view', // For communications
+        // Security & Audit
+        'security.view', 'security.manage',
+        // Content Management
+        'settings.view', // For FAQ and multilingual
+        // Election Management
+        'voters.view', // For elections
+        // System Settings - can change configs but not roles
+        'settings.view', 'settings.manage'
       ],
+      
       DEO: [
-        'dashboard.view', 'voters.view', 'voters.edit', 'voters.approve', 'voters.assign_blo',
+        // Dashboard
+        'dashboard.view',
+        // AI Services - view only
+        'ai.view_logs',
+        // Voter Management - can assign BLO
+        'voters.view', 'voters.edit', 'voters.approve', 'voters.assign_blo',
+        // Roll Revision - can dry-run but NOT commit
         'revision.view_flags', 'revision.approve_flags', 'revision.dry_run',
-        'duplicates.view', 'duplicates.resolve', 'death_records.upload', 'death_records.approve', 'death_records.view',
-        'blo_tasks.view', 'blo_tasks.assign', 'documents.approve', 'documents.view_ocr',
-        'ai.view_logs', 'grievances.view', 'grievances.manage', 'epic.view', 'epic.generate',
-        'biometric.view', 'biometric.approve', 'biometric.compare'
+        // Duplicate Detection - can split accidental merges
+        'duplicates.view', 'duplicates.resolve',
+        // Death Records - can upload CSV
+        'death_records.upload', 'death_records.approve', 'death_records.view',
+        // BLO Tasks - can assign
+        'blo_tasks.view', 'blo_tasks.assign',
+        // Grievances - full access
+        'grievances.view', 'grievances.manage',
+        // Address Analytics - can assign BLO check
+        'voters.view',
+        // Document Verification
+        'documents.view_ocr', 'documents.approve',
+        // Biometric Operations
+        'biometric.view', 'biometric.approve', 'biometric.compare',
+        // Official Communications - can create notice
+        'voters.view',
+        // Security & Audit - view only
+        'security.view',
+        // Content Management
+        'settings.view',
+        // Election Management - can manage polling stations
+        'voters.view'
       ],
+      
       ERO: [
-        'dashboard.view', 'voters.view', 'voters.edit', 'voters.approve',
+        // Dashboard
+        'dashboard.view',
+        // AI Services - view predictions only
+        'ai.view_logs',
+        // Voter Management - can approve edits
+        'voters.view', 'voters.edit', 'voters.approve',
+        // Roll Revision - can approve flags
         'revision.view_flags', 'revision.approve_flags',
-        'duplicates.view', 'duplicates.resolve', 'death_records.approve', 'death_records.view',
-        'blo_tasks.view', 'documents.approve', 'documents.view_ocr',
-        'grievances.view', 'grievances.manage', 'epic.view', 'epic.generate',
-        'biometric.view', 'biometric.approve'
+        // Duplicate Detection - can resolve
+        'duplicates.view', 'duplicates.resolve',
+        // Death Records - can approve removal
+        'death_records.approve', 'death_records.view',
+        // BLO Tasks - view only
+        'blo_tasks.view',
+        // Grievances - full access
+        'grievances.view', 'grievances.manage',
+        // Address Analytics - can flag suspicious
+        'voters.view',
+        // Document Verification
+        'documents.view_ocr', 'documents.approve',
+        // Biometric Operations - can approve
+        'biometric.view', 'biometric.approve',
+        // Official Communications - can verify documents
+        'voters.view',
+        // EPIC
+        'epic.view', 'epic.generate'
       ],
-      CRO: [
-        'dashboard.view', 'voters.view', 'blo_tasks.view', 'grievances.view'
-      ],
+      
       BLO: [
-        'dashboard.view', 'blo_tasks.view', 'blo_tasks.submit', 'grievances.view'
+        // Dashboard
+        'dashboard.view',
+        // Voter Management - view only
+        'voters.view',
+        // BLO Tasks - can view and submit
+        'blo_tasks.view', 'blo_tasks.submit',
+        // Biometric Operations - can view and request recapture
+        'biometric.view'
+        // NOTE: BLO does NOT have grievances.view according to matrix
       ],
+      
+      CRO: [
+        // Dashboard
+        'dashboard.view',
+        // Voter Management - view only
+        'voters.view',
+        // BLO Tasks - view only
+        'blo_tasks.view',
+        // Election Management - can manage candidates
+        'voters.view'
+      ],
+      
       DOC_VERIFIER: [
-        'dashboard.view', 'documents.approve', 'documents.view_ocr', 'voters.view'
+        // Dashboard
+        'dashboard.view',
+        // Voter Management - view only
+        'voters.view',
+        // Document Verification - can approve/reject
+        'documents.view_ocr', 'documents.approve'
       ],
+      
       AI_AUDITOR: [
-        'dashboard.view', 'ai.view_logs', 'duplicates.view', 'biometric.view', 'voters.view'
+        // Dashboard
+        'dashboard.view',
+        // AI Services - view logs only
+        'ai.view_logs',
+        // Voter Management - view only
+        'voters.view',
+        // Duplicate Detection - view only
+        'duplicates.view',
+        // Address Analytics - view clusters
+        'voters.view',
+        // Biometric Operations - view fraud flags
+        'biometric.view',
+        // Security & Audit - can verify hash-chain
+        'security.view'
       ],
+      
       HELPDESK: [
-        'dashboard.view', 'grievances.view', 'grievances.manage'
+        // Dashboard
+        'dashboard.view',
+        // Grievances - view and respond
+        'grievances.view', 'grievances.manage'
       ],
+      
       PRESIDING_OFFICER: [
-        'dashboard.view', 'voters.view', 'blo_tasks.view'
+        // Dashboard
+        'dashboard.view',
+        // Voter Management - view only
+        'voters.view',
+        // BLO Tasks - view only
+        'blo_tasks.view'
       ],
+      
       VIEW_ONLY: [
-        'dashboard.view', 'voters.view', 'grievances.view', 'blo_tasks.view'
+        // Dashboard - read-only
+        'dashboard.view',
+        // Voter Management - read-only
+        'voters.view',
+        // Grievances - read-only
+        'grievances.view',
+        // BLO Tasks - read-only
+        'blo_tasks.view'
       ]
     };
 

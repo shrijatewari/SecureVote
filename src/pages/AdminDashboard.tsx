@@ -234,24 +234,40 @@ export default function AdminDashboard() {
     },
   ];
 
-  // Define all modules with their required permissions
+  // Define all modules with their required permissions (EXACT MATRIX)
   const allModules = [
     { id: 'overview', name: 'Dashboard Overview', icon: '📊', path: '/admin', permission: 'dashboard.view' },
+    // AI Services - Only DEO, CEO, AI_AUDITOR, SA can view
     { id: 'ai', name: 'AI Services', icon: '🤖', path: '/admin/ai-services', permission: 'ai.view_logs' },
+    // Voter Management - All roles can view, but edit requires specific permissions
     { id: 'voters', name: 'Voter Management', icon: '👥', path: '/admin/voters', permission: 'voters.view' },
+    // Roll Revision - ERO, DEO, CEO, SA can view flags
     { id: 'revision', name: 'Roll Revision', icon: '📋', path: '/admin/revision', permission: 'revision.view_flags' },
+    // Duplicate Detection - ERO, DEO, CEO, AI_AUDITOR, SA can view
     { id: 'duplicates', name: 'Duplicate Detection', icon: '🔍', path: '/admin/duplicates', permission: 'duplicates.view' },
+    // Death Record Sync - ERO, DEO, CEO, SA can view
     { id: 'deceased', name: 'Death Record Sync', icon: '⚰️', path: '/admin/death-records', permission: 'death_records.view' },
+    // BLO Field Verification - All roles can view
     { id: 'blo', name: 'BLO Field Verification', icon: '📍', path: '/admin/blo-tasks', permission: 'blo_tasks.view' },
+    // Grievance Management - ERO, DEO, CEO, HELPDESK, SA can view
     { id: 'grievances', name: 'Grievance Management', icon: '📝', path: '/admin/grievances', permission: 'grievances.view' },
+    // Address Analytics - ERO, DEO, CEO, AI_AUDITOR, SA can view
     { id: 'address', name: 'Address Analytics', icon: '🗺️', path: '/admin/address-clusters', permission: 'voters.view' },
+    // Document Verification - ERO, DEO, CEO, DOC_VERIFIER, SA can view
     { id: 'documents', name: 'Document Verification', icon: '📄', path: '/admin/documents', permission: 'documents.view_ocr' },
+    // Biometric Operations - All roles can view (BLO can view but not approve)
     { id: 'biometric', name: 'Biometric Operations', icon: '🔐', path: '/admin/biometric', permission: 'biometric.view' },
+    // EPIC Management - ERO, DEO, CEO, SA can view
     { id: 'epic', name: 'EPIC Management', icon: '🆔', path: '/admin/epic', permission: 'epic.view' },
+    // Official Communications - DEO, CEO, SA can view
     { id: 'communications', name: 'Official Communications', icon: '📢', path: '/admin/communications', permission: 'voters.view' },
+    // Security & Audit - DEO, CEO, AI_AUDITOR, SA can view
     { id: 'security', name: 'Security & Audit', icon: '🛡️', path: '/admin/security', permission: 'security.view' },
+    // Content Management - DEO, CEO, SA can view
     { id: 'multilingual', name: 'Content Management', icon: '🌐', path: '/admin/content', permission: 'settings.view' },
+    // Election Management - CEO, CRO, SA can view
     { id: 'elections', name: 'Election Management', icon: '🗳️', path: '/admin/elections', permission: 'voters.view' },
+    // System Settings - CEO, SA can view (SA only can manage roles)
     { id: 'settings', name: 'System Settings', icon: '⚙️', path: '/admin/settings', permission: 'settings.view' },
   ];
 
