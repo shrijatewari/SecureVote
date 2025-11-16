@@ -76,12 +76,17 @@ export default function AdminDashboard() {
   const hasPermission = (permission: string): boolean => {
     // SUPERADMIN bypasses all checks - check multiple case variations
     const roleUpper = (userRole || '').toUpperCase();
-    if (roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN') {
+    if (roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN' || roleUpper === 'ECI') {
       console.log('✅ SUPERADMIN detected - bypassing permission check for:', permission);
       return true;
     }
-    if (userPermissions.includes(permission)) return true;
-    // Check wildcard permissions
+    
+    // Check exact permission match
+    if (userPermissions.includes(permission)) {
+      return true;
+    }
+    
+    // Check wildcard permissions (e.g., 'voters.*' matches 'voters.view')
     for (const perm of userPermissions) {
       if (perm.endsWith('.*')) {
         const prefix = perm.replace('.*', '');
@@ -90,6 +95,7 @@ export default function AdminDashboard() {
         }
       }
     }
+    
     return false;
   };
 
@@ -301,12 +307,20 @@ export default function AdminDashboard() {
     } catch (e) {}
   }
   
+  // Filter modules based on permissions - all roles except SUPERADMIN
   const modules = forceAllModules ? allModules : allModules.filter(module => {
-    if (!module.permission) return true;
-    return hasPermission(module.permission);
+    if (!module.permission) {
+      // Modules without permission requirement are always visible
+      return true;
+    }
+    const hasPerm = hasPermission(module.permission);
+    if (!hasPerm) {
+      console.log(`❌ Filtered out module: ${module.name} (required: ${module.permission})`);
+    }
+    return hasPerm;
   });
   
-  console.log('✅ Final modules count:', modules.length, 'IsSuperAdmin:', isSuperAdmin, 'ForceAllModules:', forceAllModules);
+  console.log('✅ Final modules count:', modules.length, 'Role:', userRole, 'IsSuperAdmin:', isSuperAdmin, 'ForceAllModules:', forceAllModules);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">

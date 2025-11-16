@@ -23,10 +23,14 @@ class BiometricAdminController {
   async compareFaces(req, res, next) {
     try {
       const { voter_id_1, voter_id_2 } = req.body;
-      const result = await biometricAdminService.compareFaces(voter_id_1, voter_id_2);
+      if (!voter_id_1 || !voter_id_2) {
+        return res.status(400).json({ success: false, error: 'Both voter_id_1 and voter_id_2 are required' });
+      }
+      const result = await biometricAdminService.compareFaces(parseInt(voter_id_1), parseInt(voter_id_2));
       res.json({ success: true, data: result });
     } catch (error) {
-      next(error);
+      console.error('Compare faces error:', error);
+      res.status(500).json({ success: false, error: error.message || 'Failed to compare faces' });
     }
   }
 
