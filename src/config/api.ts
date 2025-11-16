@@ -3,11 +3,12 @@ import axios from 'axios';
 const resolveDefaultBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL?.trim();
   if (envUrl) {
-    return envUrl;
+    // Ensure it ends with /api
+    return envUrl.endsWith('/api') ? envUrl : (envUrl.endsWith('/') ? `${envUrl}api` : `${envUrl}/api`);
   }
 
   if (typeof window !== 'undefined') {
-    const { protocol, hostname } = window.location;
+    const { protocol, hostname, port } = window.location;
     const apiPort = import.meta.env.VITE_API_PORT || '3000';
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
     const isLanIp = /^\d+\.\d+\.\d+\.\d+$/.test(hostname);
@@ -31,7 +32,7 @@ const resolveDefaultBaseUrl = () => {
     }
 
     // Production fallback assumes a reverse proxy exposes /api on the same origin
-    return `${protocol}//${hostname}/api`;
+    return `${protocol}//${hostname}${port ? `:${port}` : ''}/api`;
   }
 
   return 'http://localhost:3000/api';
@@ -45,15 +46,29 @@ if (!import.meta.env.VITE_API_URL && typeof window !== 'undefined') {
   );
 }
 
+// Ensure baseURL ends with /api but doesn't have double slashes
+const normalizeBaseURL = (url: string) => {
+  if (!url.endsWith('/api')) {
+    return url.endsWith('/') ? `${url}api` : `${url}/api`;
+  }
+  return url;
+};
+
 export const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: normalizeBaseURL(API_BASE_URL),
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // 30 second timeout
 });
 
 // Add auth token to requests (except health checks)
 api.interceptors.request.use((config) => {
+  // Ensure URL is properly formatted
+  if (config.url && !config.url.startsWith('/')) {
+    config.url = '/' + config.url;
+  }
+  
   // Skip adding token for health check endpoints
   if (config.url?.includes('/health')) {
     return config;
@@ -63,6 +78,12 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
+  // Debug logging in development
+  if (import.meta.env.DEV) {
+    console.log(`[API] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
+  }
+  
   return config;
 });
 
