@@ -132,13 +132,20 @@ export default function DeathRecordSyncDashboard() {
                 />
               </div>
               <div className="flex items-end">
-                <button
-                  onClick={runSync}
-                  disabled={loading || running}
-                  className="w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {running ? 'Syncing...' : `Run Sync (${mode})`}
-                </button>
+                {hasPermission('death_records.upload') || hasPermission('death_records.view') ? (
+                  <button
+                    onClick={runSync}
+                    disabled={loading || running || (mode === 'apply' && !hasPermission('death_records.upload'))}
+                    className="w-full px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    title={mode === 'apply' && !hasPermission('death_records.upload') ? 'Permission Denied: Only DEO/CEO can apply changes' : ''}
+                  >
+                    {running ? 'Syncing...' : `Run Sync (${mode})`}
+                  </button>
+                ) : (
+                  <div className="w-full text-sm text-gray-500 italic text-center py-2">
+                    No permission to run sync
+                  </div>
+                )}
               </div>
             </div>
           </div>
