@@ -154,7 +154,8 @@ async function seedBiometricData() {
       
       if (scoreColumnNames.includes('combined_confidence')) {
         fields.push('combined_confidence');
-        values.push(confidence);
+        // combined_confidence is likely a decimal (0-1), use similarity score
+        values.push(similarity);
       }
       
       const placeholders = fields.map(() => '?').join(', ');
