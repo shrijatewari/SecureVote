@@ -34,6 +34,8 @@ import AIServicesDashboard from './pages/admin/AIServicesDashboard';
 import GrievanceManagement from './pages/admin/GrievanceManagement';
 import EPICManagement from './pages/admin/EPICManagement';
 import BiometricOperationsDashboard from './pages/admin/BiometricOperationsDashboard';
+import ReviewTasks from './pages/admin/ReviewTasks';
+import AddressFlags from './pages/admin/AddressFlags';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
@@ -283,6 +285,22 @@ function App() {
           element={
             <ProtectedRoute adminOnly minimumRole="deo">
               <BiometricOperationsDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/review-tasks"
+          element={
+            <ProtectedRoute adminOnly minimumRole="ero">
+              <ReviewTasks />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/address-flags"
+          element={
+            <ProtectedRoute adminOnly minimumRole="ero">
+              <AddressFlags />
             </ProtectedRoute>
           }
         />

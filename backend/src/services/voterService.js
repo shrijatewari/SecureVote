@@ -1,4 +1,8 @@
 const pool = require('../config/database');
+const addressValidationService = require('./addressValidationService');
+const nameValidationService = require('./nameValidationService');
+const reviewTaskService = require('./reviewTaskService');
+const auditLogService = require('./auditLogService');
 
 class VoterService {
   async createVoter(voterData) {
@@ -80,6 +84,91 @@ class VoterService {
           }
         }
 
+        // ========== VALIDATION PIPELINE ==========
+        // 1. Address Validation
+        let addressValidation = null;
+        let registrationStatus = 'active';
+        const validationFlags = [];
+        
+        if (voterData.house_number || voterData.street || voterData.village_city) {
+          try {
+            addressValidation = await addressValidationService.validateAddress({
+              house_number: voterData.house_number,
+              street: voterData.street,
+              village_city: voterData.village_city,
+              district: voterData.district,
+              state: voterData.state,
+              pin_code: voterData.pin_code
+            });
+
+            if (!addressValidation.valid) {
+              if (addressValidation.validationResult === 'rejected') {
+                await connection.rollback();
+                connection.release();
+                throw new Error(`Address validation failed: ${addressValidation.flags.join(', ')}. Please provide a valid address.`);
+              } else {
+                registrationStatus = 'pending_review';
+                validationFlags.push(...addressValidation.flags);
+              }
+            }
+          } catch (addrError) {
+            console.warn('Address validation error (non-blocking):', addrError.message);
+            // Continue with registration but flag for review
+            registrationStatus = 'pending_review';
+            validationFlags.push('address_validation_error');
+          }
+        }
+
+        // 2. Name Validation (Father Name)
+        let fatherNameValidation = null;
+        if (voterData.father_name) {
+          try {
+            fatherNameValidation = await nameValidationService.validateName(voterData.father_name, 'father_name');
+            
+            if (!fatherNameValidation.valid || fatherNameValidation.validationResult === 'rejected') {
+              await connection.rollback();
+              connection.release();
+              throw new Error(`Father name validation failed: ${fatherNameValidation.reason || 'Invalid name format'}. Please provide a valid father's name.`);
+            } else if (fatherNameValidation.validationResult === 'flagged') {
+              registrationStatus = 'pending_review';
+              validationFlags.push('father_name_flagged');
+            }
+          } catch (nameError) {
+            if (nameError.message.includes('validation failed')) {
+              throw nameError; // Re-throw validation failures
+            }
+            console.warn('Name validation error:', nameError.message);
+            registrationStatus = 'pending_review';
+            validationFlags.push('name_validation_error');
+          }
+        }
+
+        // 3. Name Validation (Mother Name if provided)
+        let motherNameValidation = null;
+        if (voterData.mother_name) {
+          try {
+            motherNameValidation = await nameValidationService.validateName(voterData.mother_name, 'mother_name');
+            if (motherNameValidation.validationResult === 'flagged') {
+              validationFlags.push('mother_name_flagged');
+            }
+          } catch (e) {
+            // Non-blocking for mother name
+          }
+        }
+
+        // 4. Name Validation (Guardian Name if provided)
+        let guardianNameValidation = null;
+        if (voterData.guardian_name) {
+          try {
+            guardianNameValidation = await nameValidationService.validateName(voterData.guardian_name, 'guardian_name');
+            if (guardianNameValidation.validationResult === 'flagged') {
+              validationFlags.push('guardian_name_flagged');
+            }
+          } catch (e) {
+            // Non-blocking for guardian name
+          }
+        }
+
         // Generate temporary hash if not provided (will be updated by biometric service)
         const crypto = require('crypto');
         const tempHash = (voterData.biometric_hash && voterData.biometric_hash.length >= 32) 
@@ -99,7 +188,10 @@ class VoterService {
           'name', 'dob', 'aadhaar_number', 'biometric_hash', 'is_verified',
           'email', 'mobile_number', 'father_name', 'gender',
           'house_number', 'street', 'village_city', 'district', 'state', 'pin_code',
-          'fingerprint_hash', 'face_embedding_hash'
+          'fingerprint_hash', 'face_embedding_hash',
+          'normalized_address', 'address_hash', 'address_quality_score', 'name_quality_score',
+          'registration_status', 'registration_source', 'geocode_latitude', 'geocode_longitude',
+          'geocode_confidence', 'validation_flags'
         ];
         const values = [
           voterData.name ? voterData.name.trim() : null,
@@ -118,7 +210,17 @@ class VoterService {
           voterData.state ? voterData.state.trim() : null,
           voterData.pin_code,
           tempFingerprintHash,
-          tempFaceHash
+          tempFaceHash,
+          addressValidation?.normalized || null,
+          addressValidation?.addressHash || null,
+          addressValidation?.qualityScore || 1.0,
+          fatherNameValidation?.qualityScore || 1.0,
+          registrationStatus,
+          voterData.registration_source || 'web',
+          addressValidation?.geocode?.latitude || null,
+          addressValidation?.geocode?.longitude || null,
+          addressValidation?.geocode?.confidence || null,
+          JSON.stringify(validationFlags)
         ];
 
         // Add optional extended fields if provided
@@ -199,6 +301,74 @@ class VoterService {
         
         console.log('✅ Voter created successfully with ID:', voterId);
         
+        // Create review tasks if registration is pending
+        if (registrationStatus === 'pending_review' && validationFlags.length > 0) {
+          setImmediate(async () => {
+            try {
+              const taskTypes = [];
+              const taskDetails = {
+                validation_flags: validationFlags,
+                address_quality_score: addressValidation?.qualityScore,
+                name_quality_score: fatherNameValidation?.qualityScore
+              };
+
+              if (validationFlags.some(f => f.includes('address'))) {
+                taskTypes.push('address_verification');
+              }
+              if (validationFlags.some(f => f.includes('name'))) {
+                taskTypes.push('name_verification');
+              }
+
+              for (const taskType of taskTypes) {
+                await reviewTaskService.createTask({
+                  voter_id: voterId,
+                  task_type: taskType,
+                  priority: validationFlags.length > 2 ? 'high' : 'medium',
+                  details: taskDetails,
+                  validation_scores: {
+                    address: addressValidation?.qualityScore,
+                    father_name: fatherNameValidation?.qualityScore,
+                    mother_name: motherNameValidation?.qualityScore,
+                    guardian_name: guardianNameValidation?.qualityScore
+                  },
+                  flags: validationFlags
+                });
+              }
+            } catch (err) {
+              console.warn('Review task creation failed:', err.message);
+            }
+          });
+        }
+
+        // Log validation audit
+        if (addressValidation || fatherNameValidation) {
+          setImmediate(async () => {
+            try {
+              const validationAuditService = require('./validationAuditService');
+              if (addressValidation) {
+                await validationAuditService.logValidation({
+                  voter_id: voterId,
+                  validation_type: 'address',
+                  validation_result: addressValidation.validationResult,
+                  quality_scores: { address: addressValidation.qualityScore },
+                  flags: addressValidation.flags
+                });
+              }
+              if (fatherNameValidation) {
+                await validationAuditService.logValidation({
+                  voter_id: voterId,
+                  validation_type: 'name',
+                  validation_result: fatherNameValidation.validationResult,
+                  quality_scores: { father_name: fatherNameValidation.qualityScore },
+                  flags: fatherNameValidation.flags
+                });
+              }
+            } catch (err) {
+              console.warn('Validation audit log failed:', err.message);
+            }
+          });
+        }
+        
         // Log audit event (outside transaction to avoid lock timeout)
         setImmediate(async () => {
           try {
@@ -212,7 +382,9 @@ class VoterService {
                 name: voterData.name,
                 aadhaar: voterData.aadhaar_number,
                 email: voterData.email,
-                mobile: voterData.mobile_number
+                mobile: voterData.mobile_number,
+                registration_status: registrationStatus,
+                validation_flags: validationFlags
               })
             });
           } catch (err) {

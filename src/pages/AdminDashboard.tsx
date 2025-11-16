@@ -47,6 +47,8 @@ export default function AdminDashboard() {
     bloTasksPending: 0,
     suspiciousAddresses: 0,
     epicGeneratedToday: 0,
+    reviewTasksPending: 0,
+    addressFlagsOpen: 0,
   });
   const [loading, setLoading] = useState(true);
   const [chartData, setChartData] = useState<any[]>([]);
@@ -156,6 +158,8 @@ export default function AdminDashboard() {
         bloTasksPending: data.bloTasksPending || 0,
         suspiciousAddresses: stats.suspiciousAddresses,
         epicGeneratedToday: data.epicGeneratedToday || 0,
+        reviewTasksPending: data.reviewTasksPending || 0,
+        addressFlagsOpen: data.addressFlagsOpen || 0,
       });
     } catch (error) {
       console.error('Failed to fetch stats:', error);
@@ -277,6 +281,22 @@ export default function AdminDashboard() {
       color: 'bg-teal-500',
       link: '/admin/epic',
     },
+    {
+      id: 'review-tasks',
+      title: 'Review Tasks Pending',
+      value: stats.reviewTasksPending,
+      icon: '🔎',
+      color: 'bg-yellow-500',
+      link: '/admin/review-tasks',
+    },
+    {
+      id: 'address-flags',
+      title: 'Address Cluster Flags',
+      value: stats.addressFlagsOpen,
+      icon: '🚩',
+      color: 'bg-red-600',
+      link: '/admin/address-flags',
+    },
   ];
 
   // Define all modules with their required permissions (EXACT MATRIX)
@@ -292,6 +312,10 @@ export default function AdminDashboard() {
     { id: 'duplicates', name: 'Duplicate Detection', icon: '🔍', path: '/admin/duplicates', permission: 'duplicates.view' },
     // Death Record Sync - ERO, DEO, CEO, SA can view
     { id: 'deceased', name: 'Death Record Sync', icon: '⚰️', path: '/admin/death-records', permission: 'death_records.view' },
+    // Review Tasks - ERO, DEO, CEO, SA can view
+    { id: 'review-tasks', name: 'Review Tasks', icon: '🔎', path: '/admin/review-tasks', permission: 'review.view' },
+    // Address Flags - ERO, DEO, CEO, SA can view
+    { id: 'address-flags', name: 'Address Cluster Flags', icon: '🚩', path: '/admin/address-flags', permission: 'anomaly.view' },
     // BLO Field Verification - All roles can view
     { id: 'blo', name: 'BLO Field Verification', icon: '📍', path: '/admin/blo-tasks', permission: 'blo_tasks.view' },
     // Grievance Management - ERO, DEO, CEO, HELPDESK, SA can view

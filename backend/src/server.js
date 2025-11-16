@@ -39,6 +39,7 @@ const endToEndVerificationRoutes = require('./routes/endToEndVerificationRoutes'
 const aiRoutes = require('./routes/aiRoutes');
 const authRoutes = require('./routes/authRoutes');
 const adminDashboardRoutes = require('./routes/adminDashboardRoutes');
+const validationRoutes = require('./routes/validationRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -133,6 +134,7 @@ app.use('/api/ledger', ledgerRoutes);
 app.use('/api/end-to-end', endToEndVerificationRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/admin', adminDashboardRoutes);
+app.use('/api/validate', validationRoutes);
 
 // API Documentation endpoint
 app.get('/api', (req, res) => {
@@ -204,6 +206,10 @@ const ensureUsersSeeded = require('./db/ensure_users_seeded');
 ensureUsersSeeded().catch(err => {
   console.error('⚠️  Warning: Could not seed users:', err.message);
 });
+
+// Start background workers
+const addressClusterWorker = require('./workers/addressClusterWorker');
+addressClusterWorker.start();
 
 // Start server
 const server = app.listen(PORT, () => {
