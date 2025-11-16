@@ -30,6 +30,10 @@ export default function AdminDashboard() {
   const [activeModule, setActiveModule] = useState('overview');
   const [userRole, setUserRole] = useState<string>('');
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
+  
+  // Check if SUPERADMIN - computed value
+  const roleUpper = (userRole || '').toUpperCase();
+  const isSuperAdmin = roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN';
   const [stats, setStats] = useState({
     totalVoters: 0,
     verifiedVoters: 0,
@@ -59,7 +63,10 @@ export default function AdminDashboard() {
     if (userData) {
       try {
         const parsed = JSON.parse(userData);
-        setUserRole((parsed.role || 'CITIZEN').toUpperCase());
+        const role = (parsed.role || 'CITIZEN').toUpperCase();
+        console.log('🔍 Loaded user role:', role);
+        console.log('🔍 Loaded permissions:', parsed.permissions || []);
+        setUserRole(role);
         setUserPermissions(parsed.permissions || []);
       } catch (e) {
         console.error('Error parsing user data:', e);
@@ -71,8 +78,12 @@ export default function AdminDashboard() {
 
   // Check if user has permission
   const hasPermission = (permission: string): boolean => {
-    // SUPERADMIN bypasses all checks
-    if (userRole === 'SUPERADMIN' || userRole === 'superadmin') return true;
+    // SUPERADMIN bypasses all checks - check multiple case variations
+    const roleUpper = (userRole || '').toUpperCase();
+    if (roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN') {
+      console.log('✅ SUPERADMIN detected - bypassing permission check for:', permission);
+      return true;
+    }
     if (userPermissions.includes(permission)) return true;
     // Check wildcard permissions
     for (const perm of userPermissions) {
@@ -274,12 +285,20 @@ export default function AdminDashboard() {
 
   // Filter modules based on user permissions
   // SUPERADMIN sees ALL modules
-  const modules = userRole === 'SUPERADMIN' || userRole === 'superadmin' 
+  console.log('🔍 Filtering modules - Role:', userRole, 'IsSuperAdmin:', isSuperAdmin, 'Total modules:', allModules.length);
+  
+  const modules = isSuperAdmin 
     ? allModules 
     : allModules.filter(module => {
         if (!module.permission) return true; // Always show if no permission required
-        return hasPermission(module.permission);
+        const hasPerm = hasPermission(module.permission);
+        if (!hasPerm) {
+          console.log('❌ Filtered out module:', module.name, 'required permission:', module.permission);
+        }
+        return hasPerm;
       });
+  
+  console.log('✅ Final modules count:', modules.length);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -377,7 +396,7 @@ export default function AdminDashboard() {
 
               {/* Key Metrics Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-                {(userRole === 'SUPERADMIN' || userRole === 'superadmin' 
+                {(isSuperAdmin 
                   ? metricCards 
                   : metricCards.filter(card => {
                       // Show all metrics - viewing is separate from actions
@@ -426,7 +445,7 @@ export default function AdminDashboard() {
                 ))}
                 
                 {/* AI Services Card - SUPERADMIN always sees this */}
-                {(userRole === 'SUPERADMIN' || userRole === 'superadmin' || hasPermission('ai.view_logs')) && (
+                {(isSuperAdmin || hasPermission('ai.view_logs')) && (
                 <Link
                   to="/admin/ai-services"
                   className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-lg hover:shadow-2xl transition-all p-6 border-l-4 border-purple-700 group text-white"
