@@ -231,20 +231,55 @@ export default function UpdateProfile() {
     setSaving(true);
     try {
       console.log('Updating profile:', { voterId: profile.voter_id, formData });
-      const response = await profileService.updateProfile(profile.voter_id, formData);
+      
+      // Pre-process date fields to ensure correct format
+      const processedData = { ...formData };
+      if (processedData.dob) {
+        // Convert date to YYYY-MM-DD format if it's an ISO string
+        try {
+          const dateValue = processedData.dob;
+          if (typeof dateValue === 'string' && dateValue.includes('T')) {
+            const dateObj = new Date(dateValue);
+            if (!isNaN(dateObj.getTime())) {
+              const year = dateObj.getFullYear();
+              const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+              const day = String(dateObj.getDate()).padStart(2, '0');
+              processedData.dob = `${year}-${month}-${day}`;
+              console.log(`Converted DOB from ${dateValue} to ${processedData.dob}`);
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to pre-process DOB:', e);
+        }
+      }
+      
+      const response = await profileService.updateProfile(profile.voter_id, processedData);
       console.log('Update response:', response);
       
       if (response.data.success) {
         setProfile(response.data.data);
         await loadProfile();
-        alert('Profile updated successfully!');
+        alert('✅ Profile updated successfully!');
       } else {
         throw new Error(response.data.error || 'Update failed');
       }
     } catch (error: any) {
       console.error('Update profile error:', error);
-      const errorMsg = error.response?.data?.error || error.response?.data?.message || error.message || 'Failed to update profile';
-      alert(`Error: ${errorMsg}`);
+      
+      // Handle date format errors with user-friendly message
+      const errorResponse = error.response?.data;
+      if (errorResponse?.error && (
+        errorResponse.error.includes('date') || 
+        errorResponse.error.includes('Invalid date format') ||
+        errorResponse.error.includes('YYYY-MM-DD')
+      )) {
+        alert(`⚠️ Date Format Error\n\n${errorResponse.error}\n\n${errorResponse.details || 'Please check your date of birth and ensure it\'s in the correct format (YYYY-MM-DD).'}`);
+      } else if (errorResponse?.error) {
+        alert(`❌ Error: ${errorResponse.error}\n\n${errorResponse.details || ''}`);
+      } else {
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to update profile';
+        alert(`❌ Error: ${errorMsg}`);
+      }
     } finally {
       setSaving(false);
     }

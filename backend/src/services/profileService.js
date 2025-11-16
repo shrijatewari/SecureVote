@@ -189,6 +189,32 @@ class ProfileService {
       // Date fields that need format conversion (ISO datetime -> DATE)
       const dateFields = ['dob', 'biometric_reverification_date', 'consent_date'];
       
+      // Helper function to convert any date format to YYYY-MM-DD
+      const convertToDateString = (value) => {
+        if (!value) return value;
+        
+        try {
+          // If already in YYYY-MM-DD format, return as is
+          if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+            return value;
+          }
+          
+          // Try to parse as Date object
+          const dateObj = new Date(value);
+          if (!isNaN(dateObj.getTime())) {
+            // Format as YYYY-MM-DD
+            const year = dateObj.getFullYear();
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+          }
+        } catch (e) {
+          console.warn(`Failed to parse date value: ${value}`, e);
+        }
+        
+        return value; // Return original if conversion fails
+      };
+      
       for (const field of allowedFields) {
         if (profileData[field] !== undefined) {
           const oldValue = currentVoter[field];
@@ -196,18 +222,8 @@ class ProfileService {
           
           // Convert ISO datetime strings to DATE format (YYYY-MM-DD) for date fields
           if (dateFields.includes(field) && newValue) {
-            try {
-              // If it's an ISO datetime string, extract just the date part
-              if (typeof newValue === 'string' && newValue.includes('T')) {
-                const dateObj = new Date(newValue);
-                if (!isNaN(dateObj.getTime())) {
-                  // Format as YYYY-MM-DD
-                  newValue = dateObj.toISOString().split('T')[0];
-                }
-              }
-            } catch (e) {
-              console.warn(`Failed to parse date for field ${field}:`, e);
-            }
+            newValue = convertToDateString(newValue);
+            console.log(`Converted ${field} from ${profileData[field]} to ${newValue}`);
           }
 
           if (oldValue !== newValue) {

@@ -70,6 +70,28 @@ async function updateProfile(req, res, next) {
     res.json({ success: true, data: updated, message: 'Profile updated successfully' });
   } catch (error) {
     console.error('Update profile error:', error);
+    
+    // Handle date format errors specifically
+    if (error.code === 'ER_TRUNCATED_WRONG_VALUE' || error.code === 1292) {
+      const errorMsg = error.message || '';
+      if (errorMsg.includes('date') || errorMsg.includes('dob') || errorMsg.includes('Incorrect date value')) {
+        return res.status(400).json({ 
+          success: false,
+          error: 'Invalid date format. Please use YYYY-MM-DD format (e.g., 2006-06-19).',
+          details: 'The date value provided could not be processed. Please check the date format and try again.'
+        });
+      }
+    }
+    
+    // Handle other database errors
+    if (error.code && error.code.startsWith('ER_')) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Database error occurred while updating profile.',
+        details: error.message || 'Please check your input and try again.'
+      });
+    }
+    
     next(error);
   }
 }
