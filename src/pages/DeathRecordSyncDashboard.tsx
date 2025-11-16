@@ -9,6 +9,35 @@ export default function DeathRecordSyncDashboard() {
   const [running, setRunning] = useState(false);
   const [mode, setMode] = useState<'dry-run' | 'apply'>('dry-run');
   const [threshold, setThreshold] = useState(0.9);
+  const [userRole, setUserRole] = useState<string>('');
+  const [userPermissions, setUserPermissions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user_data');
+    if (userData) {
+      try {
+        const parsed = JSON.parse(userData);
+        setUserRole((parsed.role || 'CITIZEN').toUpperCase());
+        setUserPermissions(parsed.permissions || []);
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+    }
+  }, []);
+
+  const hasPermission = (permission: string): boolean => {
+    if (userRole === 'SUPERADMIN') return true;
+    if (userPermissions.includes(permission)) return true;
+    for (const perm of userPermissions) {
+      if (perm.endsWith('.*')) {
+        const prefix = perm.replace('.*', '');
+        if (permission.startsWith(prefix + '.')) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
 
   const runSync = async () => {
     setLoading(true);
@@ -161,18 +190,28 @@ export default function DeathRecordSyncDashboard() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {flag.status === 'pending' && (
                           <div className="flex space-x-2">
-                            <button
-                              onClick={() => markVoterDeceased(flag.voter_id)}
-                              className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
-                            >
-                              Mark Deceased
-                            </button>
-                            <button
-                              onClick={() => {/* Reject flag */}}
-                              className="px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
-                            >
-                              Reject
-                            </button>
+                            {hasPermission('death_records.approve') ? (
+                              <>
+                                <button
+                                  onClick={() => markVoterDeceased(flag.voter_id)}
+                                  className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                                  title="Mark voter as deceased"
+                                >
+                                  Mark Deceased
+                                </button>
+                                <button
+                                  onClick={() => {/* Reject flag */}}
+                                  className="px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
+                                  title="Reject death record flag"
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-400 italic" title="Permission Denied: Contact District Election Officer">
+                                No action permission
+                              </span>
+                            )}
                           </div>
                         )}
                       </td>

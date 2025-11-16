@@ -11,6 +11,35 @@ export default function DuplicateDetectionDashboard() {
   const [threshold, setThreshold] = useState(0.85);
   const [district, setDistrict] = useState('');
   const [state, setState] = useState('');
+  const [userRole, setUserRole] = useState<string>('');
+  const [userPermissions, setUserPermissions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user_data');
+    if (userData) {
+      try {
+        const parsed = JSON.parse(userData);
+        setUserRole((parsed.role || 'CITIZEN').toUpperCase());
+        setUserPermissions(parsed.permissions || []);
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
+    }
+  }, []);
+
+  const hasPermission = (permission: string): boolean => {
+    if (userRole === 'SUPERADMIN') return true;
+    if (userPermissions.includes(permission)) return true;
+    for (const perm of userPermissions) {
+      if (perm.endsWith('.*')) {
+        const prefix = perm.replace('.*', '');
+        if (permission.startsWith(prefix + '.')) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
 
   const runDuplicateDetection = async () => {
     setLoading(true);
@@ -143,20 +172,28 @@ export default function DuplicateDetectionDashboard() {
               </div>
             </div>
             <div className="flex space-x-4 mt-4">
-              <button
-                onClick={runDuplicateDetection}
-                disabled={loading || running}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              >
-                {running ? 'Running...' : 'Run Basic Detection'}
-              </button>
-              <button
-                onClick={runMLDetection}
-                disabled={loading || running}
-                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
-              >
-                {running ? 'Running...' : 'Run ML Detection'}
-              </button>
+              {hasPermission('duplicates.view') ? (
+                <>
+                  <button
+                    onClick={runDuplicateDetection}
+                    disabled={loading || running}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {running ? 'Running...' : 'Run Basic Detection'}
+                  </button>
+                  <button
+                    onClick={runMLDetection}
+                    disabled={loading || running}
+                    className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    {running ? 'Running...' : 'Run ML Detection'}
+                  </button>
+                </>
+              ) : (
+                <div className="text-sm text-gray-500 italic">
+                  You don't have permission to run duplicate detection. Contact your administrator.
+                </div>
+              )}
             </div>
           </div>
 
@@ -231,24 +268,35 @@ export default function DuplicateDetectionDashboard() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex space-x-2">
-                        <button
-                          onClick={() => resolveDuplicate(dup.duplicate_id || idx, 'merge')}
-                          className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
-                        >
-                          Merge
-                        </button>
-                        <button
-                          onClick={() => resolveDuplicate(dup.duplicate_id || idx, 'mark-as-ghost')}
-                          className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
-                        >
-                          Mark Ghost
-                        </button>
-                        <button
-                          onClick={() => resolveDuplicate(dup.duplicate_id || idx, 'reject')}
-                          className="px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
-                        >
-                          Reject
-                        </button>
+                        {hasPermission('duplicates.resolve') ? (
+                          <>
+                            <button
+                              onClick={() => resolveDuplicate(dup.duplicate_id || idx, 'merge')}
+                              className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                              title="Merge duplicate records"
+                            >
+                              Merge
+                            </button>
+                            <button
+                              onClick={() => resolveDuplicate(dup.duplicate_id || idx, 'mark-as-ghost')}
+                              className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                              title="Mark as ghost (fraudulent) records"
+                            >
+                              Mark Ghost
+                            </button>
+                            <button
+                              onClick={() => resolveDuplicate(dup.duplicate_id || idx, 'reject')}
+                              className="px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
+                              title="Reject duplicate flag"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic" title="Permission Denied: Contact District Election Officer">
+                            No action permission
+                          </span>
+                        )}
                       </div>
                     </td>
                   </tr>

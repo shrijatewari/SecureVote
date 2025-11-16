@@ -358,12 +358,10 @@ export default function AdminDashboard() {
               {/* Key Metrics Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
                 {metricCards.filter(card => {
-                  // Filter metrics based on permissions
-                  if (card.id === 'duplicates-merged' || card.id === 'duplicates-ghost' || card.id === 'duplicates-rejected') {
-                    return hasPermission('duplicates.resolve');
-                  }
-                  if (card.id === 'duplicates') {
-                    return hasPermission('duplicates.view');
+                  // Show all metrics - viewing is separate from actions
+                  // Only filter if user has NO permission to view the module at all
+                  if (card.id === 'duplicates' || card.id === 'duplicates-merged' || card.id === 'duplicates-ghost' || card.id === 'duplicates-rejected') {
+                    return hasPermission('duplicates.view'); // Show if can view duplicates
                   }
                   if (card.id === 'deceased') {
                     return hasPermission('death_records.view');
