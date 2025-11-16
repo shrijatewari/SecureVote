@@ -163,10 +163,18 @@ export default function UpdateProfile() {
       }
       
       if (completionRes.data?.success && completionRes.data?.data) {
-        setCompletion(completionRes.data.data);
+        const completionData = completionRes.data.data;
+        // Ensure checkpoints exists
+        if (!completionData.checkpoints) {
+          completionData.checkpoints = {};
+        }
+        setCompletion(completionData);
       } else if (completionRes.data?.success && completionRes.data?.data === null) {
         // Admin user - set empty completion
-        setCompletion({ completionPercentage: 0, completedSections: [] });
+        setCompletion({ completionPercentage: 0, checkpoints: {} });
+      } else {
+        // Default empty completion
+        setCompletion({ completionPercentage: 0, checkpoints: {} });
       }
     } catch (error: any) {
       console.error('Failed to load profile:', error);
