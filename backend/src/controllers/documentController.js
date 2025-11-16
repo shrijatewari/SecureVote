@@ -23,6 +23,13 @@ async function uploadDocument(req, res, next) {
     
     res.status(201).json({ success: true, data: result });
   } catch (error) {
+    // Handle data truncation errors specifically
+    if (error.code === 'WARN_DATA_TRUNCATED' || error.code === 1265) {
+      return res.status(400).json({ 
+        error: 'Invalid document type',
+        message: `The document type '${req.body.document_type}' is not supported. Please use one of: aadhaar, address_proof, photo, signature, disability_cert, birth_cert, marriage_cert, affidavit`
+      });
+    }
     next(error);
   }
 }

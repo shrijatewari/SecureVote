@@ -109,8 +109,17 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
     
-    // Handle timeout errors specifically
-    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+    // Handle timeout errors specifically - check multiple error formats
+    const isTimeoutError = 
+      error.code === 'ECONNABORTED' || 
+      error.code === 'ETIMEDOUT' ||
+      error.message?.toLowerCase().includes('timeout') ||
+      error.message?.toLowerCase().includes('exceeded') ||
+      (error.response?.status === 408) ||
+      (error.response?.data?.error?.toLowerCase().includes('timeout')) ||
+      (error.response?.data?.message?.toLowerCase().includes('timeout'));
+    
+    if (isTimeoutError) {
       // Check if alert already exists
       if (document.querySelector('.timeout-alert')) {
         return Promise.reject(error);
@@ -123,7 +132,7 @@ api.interceptors.response.use(
           <span>⏱️</span>
           <div>
             <div style="font-weight: bold; margin-bottom: 4px;">Request Timeout</div>
-            <div style="font-size: 14px;">The request is taking longer than expected. Please try again or check your connection.</div>
+            <div style="font-size: 14px;">The request is taking longer than expected (2 minutes). Please try again or check your connection.</div>
           </div>
         </div>
       `;
@@ -131,7 +140,7 @@ api.interceptors.response.use(
       document.body.appendChild(alert);
       setTimeout(() => {
         alert.remove();
-      }, 5000);
+      }, 8000);
       
       return Promise.reject(error);
     }
