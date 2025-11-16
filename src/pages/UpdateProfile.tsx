@@ -97,7 +97,6 @@ export default function UpdateProfile() {
 
       // Get voter ID from user data
       let voterId = null;
-      const userData = localStorage.getItem('user_data');
       if (userData) {
         try {
           const user = JSON.parse(userData);
