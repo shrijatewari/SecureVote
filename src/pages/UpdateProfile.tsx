@@ -728,20 +728,34 @@ export default function UpdateProfile() {
                     <button
                       onClick={async () => {
                         try {
+                          setSaving(true);
                           const response = await profileService.importFromDigiLocker(
                             profile.voter_id,
                             profile.aadhaar_number
                           );
-                          alert('Data imported from DigiLocker (mock)');
-                          await loadProfile();
-                        } catch (error) {
-                          alert('Failed to import from DigiLocker');
+                          if (response.data?.success) {
+                            const fieldsUpdated = response.data.data?.fields_updated || 0;
+                            alert(`✅ Successfully imported ${fieldsUpdated} fields from DigiLocker!\n\nYour profile has been updated with:\n- Personal details\n- Identification documents\n- Address information\n- Education & occupation`);
+                            await loadProfile();
+                          } else {
+                            alert('Data imported from DigiLocker (mock)');
+                            await loadProfile();
+                          }
+                        } catch (error: any) {
+                          console.error('DigiLocker import error:', error);
+                          alert(`Failed to import from DigiLocker: ${error.response?.data?.error || error.message || 'Unknown error'}`);
+                        } finally {
+                          setSaving(false);
                         }
                       }}
-                      className="text-green-700 hover:underline font-medium"
+                      className="text-green-700 hover:underline font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={saving}
                     >
-                      📥 Import from DigiLocker (Mock)
+                      {saving ? '⏳ Importing...' : '📥 Import from DigiLocker (Mock)'}
                     </button>
+                    <p className="text-xs text-gray-600 mt-2">
+                      Click to import mock data from DigiLocker including personal details, identification documents, and address information.
+                    </p>
                   </div>
                   <button onClick={() => handleSave('identification')} className="btn-primary" disabled={saving}>
                     {saving ? 'Saving...' : 'Save Identification Details'}

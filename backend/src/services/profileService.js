@@ -186,10 +186,29 @@ class ProfileService {
         'consent_residency_confirmed', 'consent_eci_matching', 'consent_date'
       ];
 
+      // Date fields that need format conversion (ISO datetime -> DATE)
+      const dateFields = ['dob', 'biometric_reverification_date', 'consent_date'];
+      
       for (const field of allowedFields) {
         if (profileData[field] !== undefined) {
           const oldValue = currentVoter[field];
-          const newValue = profileData[field];
+          let newValue = profileData[field];
+          
+          // Convert ISO datetime strings to DATE format (YYYY-MM-DD) for date fields
+          if (dateFields.includes(field) && newValue) {
+            try {
+              // If it's an ISO datetime string, extract just the date part
+              if (typeof newValue === 'string' && newValue.includes('T')) {
+                const dateObj = new Date(newValue);
+                if (!isNaN(dateObj.getTime())) {
+                  // Format as YYYY-MM-DD
+                  newValue = dateObj.toISOString().split('T')[0];
+                }
+              }
+            } catch (e) {
+              console.warn(`Failed to parse date for field ${field}:`, e);
+            }
+          }
 
           if (oldValue !== newValue) {
             fieldsToUpdate.push(`${field} = ?`);
@@ -384,18 +403,152 @@ class ProfileService {
    * Mock DigiLocker import
    */
   async importFromDigiLocker(voterId, aadhaarNumber) {
-    // This is a mock implementation
-    // In real system, this would call DigiLocker API
-    const mockData = {
-      name: 'Sample Name',
-      dob: '1990-01-01',
-      gender: 'male',
-      father_name: 'Father Name',
-      address: '123 Sample Street, Sample City',
-      photo_url: null
-    };
+    const connection = await pool.getConnection();
+    try {
+      // This is a mock implementation
+      // In real system, this would call DigiLocker API
+      const mockData = {
+        name: 'Rajesh Kumar',
+        dob: '1990-05-15',
+        gender: 'male',
+        father_name: 'Suresh Kumar',
+        mother_name: 'Priya Kumar',
+        pan_number: 'ABCDE1234F',
+        driving_license_number: 'DL-01-2020-1234567',
+        passport_number: 'A12345678',
+        ration_card_number: 'RC123456789',
+        house_number: '123',
+        street: 'MG Road',
+        village_city: 'Bangalore',
+        district: 'Bangalore Urban',
+        state: 'Karnataka',
+        pin_code: '560001',
+        education_level: 'Graduate',
+        occupation: 'Software Engineer',
+        marital_status: 'Married',
+        spouse_name: 'Sunita Kumar'
+      };
 
-    return mockData;
+      // Actually update the voter profile with mock data
+      const updateFields = [];
+      const updateValues = [];
+      
+      // Map mock data to database fields
+      if (mockData.name) {
+        updateFields.push('name = ?');
+        updateValues.push(mockData.name);
+      }
+      if (mockData.dob) {
+        updateFields.push('dob = ?');
+        updateValues.push(mockData.dob);
+      }
+      if (mockData.gender) {
+        updateFields.push('gender = ?');
+        updateValues.push(mockData.gender);
+      }
+      if (mockData.father_name) {
+        updateFields.push('father_name = ?');
+        updateValues.push(mockData.father_name);
+      }
+      if (mockData.mother_name) {
+        updateFields.push('mother_name = ?');
+        updateValues.push(mockData.mother_name);
+      }
+      if (mockData.pan_number) {
+        updateFields.push('pan_number = ?');
+        updateValues.push(mockData.pan_number);
+      }
+      if (mockData.driving_license_number) {
+        updateFields.push('driving_license_number = ?');
+        updateValues.push(mockData.driving_license_number);
+      }
+      if (mockData.passport_number) {
+        updateFields.push('passport_number = ?');
+        updateValues.push(mockData.passport_number);
+      }
+      if (mockData.ration_card_number) {
+        updateFields.push('ration_card_number = ?');
+        updateValues.push(mockData.ration_card_number);
+      }
+      if (mockData.house_number) {
+        updateFields.push('house_number = ?');
+        updateValues.push(mockData.house_number);
+      }
+      if (mockData.street) {
+        updateFields.push('street = ?');
+        updateValues.push(mockData.street);
+      }
+      if (mockData.village_city) {
+        updateFields.push('village_city = ?');
+        updateValues.push(mockData.village_city);
+      }
+      if (mockData.district) {
+        updateFields.push('district = ?');
+        updateValues.push(mockData.district);
+      }
+      if (mockData.state) {
+        updateFields.push('state = ?');
+        updateValues.push(mockData.state);
+      }
+      if (mockData.pin_code) {
+        updateFields.push('pin_code = ?');
+        updateValues.push(mockData.pin_code);
+      }
+      if (mockData.education_level) {
+        updateFields.push('education_level = ?');
+        updateValues.push(mockData.education_level);
+      }
+      if (mockData.occupation) {
+        updateFields.push('occupation = ?');
+        updateValues.push(mockData.occupation);
+      }
+      if (mockData.marital_status) {
+        updateFields.push('marital_status = ?');
+        updateValues.push(mockData.marital_status);
+      }
+      if (mockData.spouse_name) {
+        updateFields.push('spouse_name = ?');
+        updateValues.push(mockData.spouse_name);
+      }
+
+      if (updateFields.length > 0) {
+        updateValues.push(voterId);
+        await connection.query(
+          `UPDATE voters SET ${updateFields.join(', ')}, profile_last_updated = NOW() WHERE voter_id = ?`,
+          updateValues
+        );
+        
+        // Log audit event
+        setImmediate(async () => {
+          try {
+            const auditService = require('./auditLogService');
+            await auditService.logAction({
+              action_type: 'profile_updated',
+              entity_type: 'voter',
+              entity_id: voterId,
+              actor_id: voterId,
+              metadata: JSON.stringify({
+                source: 'digilocker_import',
+                fields_updated: updateFields.length
+              })
+            });
+          } catch (err) {
+            console.warn('Audit log failed:', err.message);
+          }
+        });
+      }
+
+      // Recalculate completion percentage
+      await this.calculateCompletion(voterId);
+
+      return {
+        ...mockData,
+        message: 'Data successfully imported from DigiLocker',
+        fields_updated: updateFields.length
+      };
+    } finally {
+      connection.release();
+    }
   }
 }
 
