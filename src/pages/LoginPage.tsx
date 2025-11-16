@@ -45,10 +45,19 @@ export default function LoginPage({ setUser, setIsAdmin }: { setUser: (user: any
       }
     } catch (err: any) {
       console.error('Login error:', err);
+      console.error('Error details:', {
+        code: err.code,
+        message: err.message,
+        response: err.response?.data,
+        config: err.config
+      });
+      
       let errorMsg = 'Login failed. Please try again.';
       
-      if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error')) {
-        errorMsg = 'Network error: Please check your internet connection and ensure the backend server is running.';
+      if (err.code === 'ERR_NETWORK' || err.message?.includes('Network Error') || err.message?.includes('Failed to fetch')) {
+        errorMsg = 'Cannot connect to backend server. Please ensure:\n1. Backend server is running on http://localhost:3000\n2. No firewall is blocking the connection\n3. Check browser console for details';
+      } else if (err.response?.status === 401) {
+        errorMsg = err.response.data?.error || 'Invalid email or password';
       } else if (err.response?.data?.error) {
         errorMsg = err.response.data.error;
       } else if (err.message) {

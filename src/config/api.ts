@@ -7,32 +7,18 @@ const resolveDefaultBaseUrl = () => {
     return envUrl.endsWith('/api') ? envUrl : (envUrl.endsWith('/') ? `${envUrl}api` : `${envUrl}/api`);
   }
 
+  // Always use localhost:3000/api for local development
   if (typeof window !== 'undefined') {
-    const { protocol, hostname, port } = window.location;
-    const apiPort = import.meta.env.VITE_API_PORT || '3000';
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-    const isLanIp = /^\d+\.\d+\.\d+\.\d+$/.test(hostname);
-    const isVercel = hostname.includes('vercel.app');
-
+    const { hostname } = window.location;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '';
+    
     if (isLocalhost) {
-      return `http://localhost:${apiPort}/api`;
+      return 'http://localhost:3000/api';
     }
 
-    if (isLanIp) {
-      const preferredProtocol = protocol === 'https:' ? 'https' : 'http';
-      return `${preferredProtocol}://${hostname}:${apiPort}/api`;
-    }
-
-    // For Vercel deployments, use the backend URL from env or default backend
-    if (isVercel) {
-      // If backend is deployed separately, use that URL
-      // Otherwise, assume backend is at a known URL
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://your-backend-url.vercel.app';
-      return `${backendUrl}/api`;
-    }
-
-    // Production fallback assumes a reverse proxy exposes /api on the same origin
-    return `${protocol}//${hostname}${port ? `:${port}` : ''}/api`;
+    // For production/Vercel, use environment variable or default
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
+    return `${backendUrl}/api`;
   }
 
   return 'http://localhost:3000/api';
