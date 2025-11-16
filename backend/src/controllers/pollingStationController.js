@@ -24,11 +24,10 @@ async function getStationById(req, res, next) {
 async function getAllStations(req, res, next) {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const filters = {
-      district: req.query.district,
-      state: req.query.state
-    };
+    const limit = parseInt(req.query.limit) || 2000;
+    const filters = {};
+    if (req.query.district) filters.district = req.query.district.trim();
+    if (req.query.state) filters.state = req.query.state.trim();
     const result = await pollingStationService.getAllStations(page, limit, filters);
     res.json({ success: true, ...result });
   } catch (error) {
