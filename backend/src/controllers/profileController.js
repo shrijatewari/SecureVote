@@ -70,7 +70,11 @@ async function getCompletionStatus(req, res, next) {
     if (userRole && userRole !== 'citizen') {
       return res.status(200).json({ 
         success: true, 
-        data: { completionPercentage: 0, completedSections: [] },
+        data: { 
+          completionPercentage: 0, 
+          completedSections: [],
+          checkpoints: {}
+        },
         message: 'Admin users do not have voter profiles'
       });
     }
@@ -88,16 +92,32 @@ async function getCompletionStatus(req, res, next) {
     if (!voterId || isNaN(voterId)) {
       return res.status(200).json({ 
         success: true, 
-        data: { completionPercentage: 0, completedSections: [] },
+        data: { 
+          completionPercentage: 0, 
+          completedSections: [],
+          checkpoints: {}
+        },
         message: 'No voter profile associated with this account'
       });
     }
     
     const status = await profileService.getCompletionStatus(voterId);
+    // Ensure checkpoints exists
+    if (!status.checkpoints) {
+      status.checkpoints = {};
+    }
     res.json({ success: true, data: status });
   } catch (error) {
     console.error('Get completion status error:', error);
-    next(error);
+    // Return safe default on error
+    res.status(200).json({ 
+      success: true, 
+      data: { 
+        completionPercentage: 0, 
+        completedSections: [],
+        checkpoints: {}
+      }
+    });
   }
 }
 
