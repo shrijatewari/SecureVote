@@ -287,18 +287,13 @@ export default function AdminDashboard() {
   // SUPERADMIN sees ALL modules
   console.log('🔍 Filtering modules - Role:', userRole, 'IsSuperAdmin:', isSuperAdmin, 'Total modules:', allModules.length);
   
-  const modules = isSuperAdmin 
-    ? allModules 
-    : allModules.filter(module => {
-        if (!module.permission) return true; // Always show if no permission required
-        const hasPerm = hasPermission(module.permission);
-        if (!hasPerm) {
-          console.log('❌ Filtered out module:', module.name, 'required permission:', module.permission);
-        }
-        return hasPerm;
-      });
+  // FORCE SUPERADMIN to see all modules - no filtering at all
+  const modules = isSuperAdmin ? allModules : allModules.filter(module => {
+    if (!module.permission) return true;
+    return hasPermission(module.permission);
+  });
   
-  console.log('✅ Final modules count:', modules.length);
+  console.log('✅ Final modules count:', modules.length, 'IsSuperAdmin:', isSuperAdmin);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
