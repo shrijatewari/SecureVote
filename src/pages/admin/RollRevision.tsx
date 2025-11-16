@@ -15,7 +15,7 @@ export default function RollRevision() {
   const fetchBatches = async () => {
     try {
       const response = await revisionService.getAll(1, 100);
-      setRevisionBatches(response.data.revision_batches || []);
+      setRevisionBatches(response.data.batches || []);
     } catch (error) {
       console.error('Failed to fetch batches:', error);
     }
@@ -27,10 +27,17 @@ export default function RollRevision() {
     try {
       // Call dry-run API
       const response = await revisionService.runDryRun({ region: 'all' });
-      setFlags(response.data.flags || []);
-      alert(`Dry-run completed. Found ${response.data.flags?.length || 0} flags.`);
+      const result = response.data || response;
+      setFlags(result.flags || []);
+      if (result.batch_id) {
+        // Fetch batch flags
+        const flagsResponse = await revisionService.getBatchFlags(result.batch_id);
+        setFlags(flagsResponse.data?.flags || result.flags || []);
+      }
+      alert(`Dry-run completed. Found ${result.flags_count || result.flags?.length || 0} flags.`);
+      fetchBatches(); // Refresh batches
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to run dry-run');
+      alert(error.response?.data?.error || error.message || 'Failed to run dry-run');
     } finally {
       setLoading(false);
     }

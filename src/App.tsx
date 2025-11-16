@@ -33,6 +33,7 @@ import RollRevision from './pages/admin/RollRevision';
 import AIServicesDashboard from './pages/admin/AIServicesDashboard';
 import GrievanceManagement from './pages/admin/GrievanceManagement';
 import EPICManagement from './pages/admin/EPICManagement';
+import BiometricOperationsDashboard from './pages/admin/BiometricOperationsDashboard';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
@@ -274,6 +275,14 @@ function App() {
           element={
             <ProtectedRoute adminOnly minimumRole="blo" allowedRoles={['blo', 'ero', 'deo', 'ceo', 'eci']}>
               <BLOTaskDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/biometric"
+          element={
+            <ProtectedRoute adminOnly minimumRole="deo">
+              <BiometricOperationsDashboard />
             </ProtectedRoute>
           }
         />

@@ -67,6 +67,23 @@ export const auditLogService = {
 };
 
 
+// Biometric Admin
+export const biometricAdminService = {
+  getStats: () => api.get('/admin/biometrics/stats'),
+  getVoterBiometric: (voterId: number) => api.get(`/admin/biometrics/voter/${voterId}`),
+  compareFaces: (voterId1: number, voterId2: number) => api.post('/admin/biometrics/face-match', { voter_id_1: voterId1, voter_id_2: voterId2 }),
+  compareFingerprints: (voterId1: number, voterId2: number) => api.post('/admin/biometrics/fingerprint-match', { voter_id_1: voterId1, voter_id_2: voterId2 }),
+  getPendingVerifications: (page = 1, limit = 10) => api.get(`/admin/biometrics/pending?page=${page}&limit=${limit}`),
+  approveBiometric: (biometricId: number) => api.post(`/admin/biometrics/${biometricId}/approve`),
+  rejectBiometric: (biometricId: number, reason: string) => api.post(`/admin/biometrics/${biometricId}/reject`, { reason }),
+  requestRecapture: (biometricId: number) => api.post(`/admin/biometrics/${biometricId}/recapture-request`),
+  getFraudFlags: () => api.get('/admin/biometrics/fraud-flags'),
+  getFraudClusters: () => api.get('/admin/biometrics/fraud-clusters'),
+  getLogs: (page = 1, limit = 50) => api.get(`/admin/biometrics/logs?page=${page}&limit=${limit}`),
+  getEnrollments: (page = 1, limit = 10) => api.get(`/admin/biometrics/enrollments?page=${page}&limit=${limit}`),
+  approveEnrollment: (biometricId: number) => api.post(`/admin/biometrics/enrollment/${biometricId}/approve`),
+};
+
 // Biometric
 export const biometricService = {
   register: (voterId: number, faceData: string, fingerprintData: string) =>
@@ -245,6 +262,13 @@ export const appealService = {
 
 // Revision Announcements & Roll Revision
 export const revisionService = {
+  // Batch Management
+  getAll: (page = 1, limit = 10) => api.get(`/revision/batches?page=${page}&limit=${limit}`),
+  getBatchById: (id: number) => api.get(`/revision/batches/${id}`),
+  runDryRun: (options: any) => api.post('/revision/dry-run', options),
+  commit: (batchId: number) => api.post(`/revision/batches/${batchId}/commit`),
+  getBatchFlags: (batchId: number) => api.get(`/revision/batches/${batchId}/flags`),
+  // Announcements
   getActiveAnnouncements: (region?: any) => {
     const params = new URLSearchParams();
     if (region?.district) params.append('district', region.district);
@@ -254,12 +278,6 @@ export const revisionService = {
   getAllAnnouncements: (page = 1, limit = 10) => api.get(`/revision/announcements/all?page=${page}&limit=${limit}`),
   getAnnouncementById: (id: number) => api.get(`/revision/announcements/${id}`),
   createAnnouncement: (data: any) => api.post('/revision/announce', data),
-  // Roll Revision Admin Methods
-  getAll: (page = 1, limit = 10) => api.get(`/revision/batches?page=${page}&limit=${limit}`),
-  getBatchById: (id: number) => api.get(`/revision/batches/${id}`),
-  runDryRun: (options: any) => api.post('/revision/run', options),
-  commit: (batchId: number) => api.post(`/revision/batches/${batchId}/commit`),
-  getFlags: (batchId: number) => api.get(`/revision/batches/${batchId}/flags`),
 };
 
 // Communications
