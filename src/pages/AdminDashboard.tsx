@@ -30,10 +30,6 @@ export default function AdminDashboard() {
   const [activeModule, setActiveModule] = useState('overview');
   const [userRole, setUserRole] = useState<string>('');
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
-  
-  // Check if SUPERADMIN - computed value
-  const roleUpper = (userRole || '').toUpperCase();
-  const isSuperAdmin = roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN';
   const [stats, setStats] = useState({
     totalVoters: 0,
     verifiedVoters: 0,
@@ -284,8 +280,11 @@ export default function AdminDashboard() {
   ];
 
   // Filter modules based on user permissions
-  // SUPERADMIN sees ALL modules
-  console.log('🔍 Filtering modules - Role:', userRole, 'IsSuperAdmin:', isSuperAdmin, 'Total modules:', allModules.length);
+  // SUPERADMIN sees ALL modules - FORCE IT
+  const roleUpper = (userRole || '').toUpperCase();
+  const isSuperAdmin = roleUpper === 'SUPERADMIN' || roleUpper === 'SUPER_ADMIN' || roleUpper.includes('SUPERADMIN');
+  
+  console.log('🔍 Filtering modules - Role:', userRole, 'RoleUpper:', roleUpper, 'IsSuperAdmin:', isSuperAdmin, 'Total modules:', allModules.length);
   
   // FORCE SUPERADMIN to see all modules - no filtering at all
   const modules = isSuperAdmin ? allModules : allModules.filter(module => {
