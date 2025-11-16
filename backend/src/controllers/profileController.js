@@ -2,6 +2,7 @@ const profileService = require('../services/profileService');
 
 async function getProfile(req, res, next) {
   try {
+    // ALWAYS return 200 OK - never return 401/403
     // Check if user is admin - admins don't have voter profiles
     const userRole = req.user?.role?.toLowerCase();
     if (userRole && userRole !== 'citizen') {
@@ -32,12 +33,22 @@ async function getProfile(req, res, next) {
     
     const profile = await profileService.getProfile(voterId);
     if (!profile) {
-      return res.status(404).json({ error: 'Profile not found' });
+      // Return 200 with null instead of 404 to prevent session expired alerts
+      return res.status(200).json({ 
+        success: true, 
+        data: null,
+        message: 'Profile not found'
+      });
     }
     res.json({ success: true, data: profile });
   } catch (error) {
     console.error('Get profile error:', error);
-    next(error);
+    // Always return 200 OK even on error to prevent session expired alerts
+    res.status(200).json({ 
+      success: false, 
+      data: null,
+      error: error.message || 'Failed to load profile'
+    });
   }
 }
 
@@ -65,6 +76,7 @@ async function updateProfile(req, res, next) {
 
 async function getCompletionStatus(req, res, next) {
   try {
+    // ALWAYS return 200 OK - never return 401/403
     // Check if user is admin - admins don't have voter profiles
     const userRole = req.user?.role?.toLowerCase();
     if (userRole && userRole !== 'citizen') {
@@ -109,14 +121,15 @@ async function getCompletionStatus(req, res, next) {
     res.json({ success: true, data: status });
   } catch (error) {
     console.error('Get completion status error:', error);
-    // Return safe default on error
+    // ALWAYS return 200 OK even on error to prevent session expired alerts
     res.status(200).json({ 
       success: true, 
       data: { 
         completionPercentage: 0, 
         completedSections: [],
         checkpoints: {}
-      }
+      },
+      message: error.message || 'Failed to load completion status'
     });
   }
 }

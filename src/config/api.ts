@@ -79,25 +79,32 @@ api.interceptors.request.use((config) => {
 // Handle 401 errors globally
 api.interceptors.response.use(
   (response) => {
-    // Always allow 200 responses through, even for profile endpoints
+    // Always allow 200 responses through
     return response;
   },
   (error) => {
-    const url = error.config?.url || error.config?.baseURL + error.config?.url || '';
+    // Get full URL from config (handles both relative and absolute)
+    const configUrl = error.config?.url || '';
+    const baseURL = error.config?.baseURL || '';
+    const fullUrl = baseURL + configUrl;
     const status = error.response?.status;
     
-    // NEVER show session expired for profile/completion endpoints - they return 200 with null for admins
-    // Also skip health checks
-    // Check both relative and absolute URLs
-    const isProfileEndpoint = url.includes('/profile') || url.includes('/completion');
-    const isHealthEndpoint = url.includes('/health');
+    // CRITICAL: NEVER show session expired for profile/completion endpoints
+    // Check URL in multiple ways to catch all variations
+    const urlLower = fullUrl.toLowerCase();
+    const isProfileEndpoint = urlLower.includes('/profile') || 
+                             urlLower.includes('/completion') ||
+                             configUrl.includes('/profile') ||
+                             configUrl.includes('/completion');
+    const isHealthEndpoint = urlLower.includes('/health') || configUrl.includes('/health');
     
+    // ALWAYS skip session expired alert for profile/completion/health endpoints
     if (isHealthEndpoint || isProfileEndpoint) {
-      // Silently reject - don't trigger session expired for these
+      // Silently reject - these endpoints return 200 with null for admin users
       return Promise.reject(error);
     }
     
-    // Skip handling if status is 200 (shouldn't happen, but just in case)
+    // Skip handling if status is 200
     if (status === 200) {
       return Promise.reject(error);
     }
@@ -112,44 +119,47 @@ api.interceptors.response.use(
                           errorMsg.includes('unauthorized') ||
                           errorMsg.includes('access token required');
       
-      // Only show session expired for actual token errors, not for other 401/403 errors
+      // Only show session expired for actual token errors
       if (isTokenError) {
-        // Check if user is admin - admins might get 401/403 for profile endpoints but shouldn't trigger session expired
+        // Additional safety check: Check if user is admin or on admin page
         const userData = localStorage.getItem('user_data');
-        const isAdmin = userData && (() => {
-          try {
+        let isAdmin = false;
+        try {
+          if (userData) {
             const user = JSON.parse(userData);
             const role = (user.role || 'citizen').toLowerCase();
-            return role !== 'citizen';
-          } catch {
-            return false;
+            isAdmin = role !== 'citizen';
           }
-        })();
+        } catch {
+          // Ignore parsing errors
+        }
         
-        // Don't show session expired if we're on admin dashboard or user is admin
         const isAdminPage = window.location.pathname.includes('/admin');
+        
+        // NEVER show session expired for admin users or on admin pages
         if (isAdminPage || isAdmin) {
-          // For admin users, 401/403 might be expected for certain endpoints
-          // Don't trigger session expired unless it's clearly a token issue
+          return Promise.reject(error);
+        }
+        
+        // Check if alert already exists
+        if (document.querySelector('.session-expired-alert')) {
           return Promise.reject(error);
         }
         
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user_data');
-        // Don't redirect if we're already on login page
+        
+        // Don't redirect if already on login page
         if (window.location.pathname !== '/login') {
-          // Only show alert if not already showing one
-          if (!document.querySelector('.session-expired-alert')) {
-            const alert = document.createElement('div');
-            alert.className = 'session-expired-alert';
-            alert.textContent = 'Your session has expired. Please log in again.';
-            alert.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px; border-radius: 8px; z-index: 10000; box-shadow: 0 4px 6px rgba(0,0,0,0.1);';
-            document.body.appendChild(alert);
-            setTimeout(() => {
-              alert.remove();
-              window.location.href = '/login';
-            }, 2000);
-          }
+          const alert = document.createElement('div');
+          alert.className = 'session-expired-alert';
+          alert.textContent = 'Your session has expired. Please log in again.';
+          alert.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #ef4444; color: white; padding: 16px; border-radius: 8px; z-index: 10000; box-shadow: 0 4px 6px rgba(0,0,0,0.1);';
+          document.body.appendChild(alert);
+          setTimeout(() => {
+            alert.remove();
+            window.location.href = '/login';
+          }, 2000);
         }
       }
     }
