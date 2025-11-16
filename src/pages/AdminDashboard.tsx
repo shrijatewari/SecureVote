@@ -404,7 +404,7 @@ export default function AdminDashboard() {
 
               {/* Key Metrics Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
-                {(isSuperAdmin 
+                {(forceAllModules 
                   ? metricCards 
                   : metricCards.filter(card => {
                       // Show all metrics - viewing is separate from actions
@@ -453,7 +453,7 @@ export default function AdminDashboard() {
                 ))}
                 
                 {/* AI Services Card - SUPERADMIN always sees this */}
-                {(isSuperAdmin || hasPermission('ai.view_logs')) && (
+                {(forceAllModules || hasPermission('ai.view_logs')) && (
                 <Link
                   to="/admin/ai-services"
                   className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-lg hover:shadow-2xl transition-all p-6 border-l-4 border-purple-700 group text-white"
