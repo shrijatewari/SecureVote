@@ -43,6 +43,9 @@ const adminDashboardRoutes = require('./routes/adminDashboardRoutes');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Increase server timeout for long-running operations (2 minutes)
+app.timeout = 120000; // 120 seconds
+
 // Middleware
 const allowedOrigins = [
   'http://localhost:5173',

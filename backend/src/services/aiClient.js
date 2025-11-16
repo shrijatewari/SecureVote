@@ -147,7 +147,7 @@ class AIClient {
       const response = await axios.post(
         `${AI_SERVICES.duplicate}/batch-run`,
         { records, threshold },
-        { timeout: 30000 }
+        { timeout: 120000 } // 120 seconds for batch operations
       );
       return response.data;
     } catch (error) {

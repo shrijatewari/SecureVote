@@ -48,7 +48,7 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 second timeout
+  timeout: 120000, // 120 second (2 minute) timeout for long-running operations
 });
 
 // Add auth token to requests (except health checks)
@@ -106,6 +106,33 @@ api.interceptors.response.use(
     
     // Skip handling if status is 200
     if (status === 200) {
+      return Promise.reject(error);
+    }
+    
+    // Handle timeout errors specifically
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      // Check if alert already exists
+      if (document.querySelector('.timeout-alert')) {
+        return Promise.reject(error);
+      }
+      
+      const alert = document.createElement('div');
+      alert.className = 'timeout-alert';
+      alert.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span>⏱️</span>
+          <div>
+            <div style="font-weight: bold; margin-bottom: 4px;">Request Timeout</div>
+            <div style="font-size: 14px;">The request is taking longer than expected. Please try again or check your connection.</div>
+          </div>
+        </div>
+      `;
+      alert.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #f59e0b; color: white; padding: 16px; border-radius: 8px; z-index: 10000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 400px;';
+      document.body.appendChild(alert);
+      setTimeout(() => {
+        alert.remove();
+      }, 5000);
+      
       return Promise.reject(error);
     }
     
