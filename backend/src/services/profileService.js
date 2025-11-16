@@ -8,10 +8,15 @@ const crypto = require('crypto');
 class ProfileService {
   /**
    * Calculate profile completion percentage
+   * Now with retry logic and non-blocking execution
    */
-  async calculateCompletion(voterId) {
+  async calculateCompletion(voterId, retries = 3) {
     const connection = await pool.getConnection();
     try {
+      // Set lock wait timeout to 30 seconds for this connection
+      await connection.query('SET innodb_lock_wait_timeout = 30');
+      
+      // Use regular SELECT - we'll handle lock timeouts with retry logic
       const [voter] = await connection.query(
         'SELECT * FROM voters WHERE voter_id = ?',
         [voterId]
@@ -71,12 +76,22 @@ class ProfileService {
       const percentage = Math.round((completed / total) * 100);
 
       // Update completion percentage
+      // Use a quick update with timeout handling
       await connection.query(
         'UPDATE voters SET profile_completion_percentage = ?, profile_last_updated = NOW() WHERE voter_id = ?',
         [percentage, voterId]
       );
 
       return percentage;
+    } catch (error) {
+      // Retry on lock wait timeout with exponential backoff
+      if ((error.code === 'ER_LOCK_WAIT_TIMEOUT' || error.code === 'ER_LOCK_DEADLOCK' || error.code === 1205) && retries > 0) {
+        connection.release();
+        const backoffDelay = Math.pow(2, 3 - retries) * 100; // 100ms, 200ms, 400ms
+        await new Promise(resolve => setTimeout(resolve, backoffDelay));
+        return this.calculateCompletion(voterId, retries - 1);
+      }
+      throw error;
     } finally {
       connection.release();
     }
@@ -255,9 +270,6 @@ class ProfileService {
         }
       }
 
-      // Update completion percentage
-      await this.calculateCompletion(voterId);
-
       // Update personal_info checkpoint if basic fields are complete
       const [updated] = await connection.query(
         'SELECT name, gender, dob, father_name FROM voters WHERE voter_id = ?',
@@ -268,6 +280,17 @@ class ProfileService {
       }
 
       await connection.commit();
+
+      // Calculate completion ASYNCHRONOUSLY after transaction commits to avoid lock contention
+      // Use setImmediate to run in next event loop tick, preventing blocking
+      setImmediate(async () => {
+        try {
+          await this.calculateCompletion(voterId);
+        } catch (error) {
+          // Log but don't throw - completion calculation failure shouldn't break profile update
+          console.warn(`Failed to calculate completion for voter ${voterId}:`, error.message);
+        }
+      });
 
       return await this.getProfile(voterId);
     } catch (error) {
