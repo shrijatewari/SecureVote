@@ -156,26 +156,30 @@ export default function EnhancedLandingPage() {
     <div className="min-h-screen bg-gradient-to-br from-primary-navy via-primary-royal to-primary-light relative overflow-hidden">
       {/* Animated Background Particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-2 h-2 bg-white/20 rounded-full"
-            initial={{
-              x: Math.random() * window.innerWidth,
-              y: Math.random() * window.innerHeight,
-            }}
-            animate={{
-              y: [null, Math.random() * window.innerHeight],
-              x: [null, Math.random() * window.innerWidth],
-            }}
-            transition={{
-              duration: Math.random() * 10 + 10,
-              repeat: Infinity,
-              repeatType: 'reverse',
-              ease: 'linear',
-            }}
-          />
-        ))}
+        {[...Array(20)].map((_, i) => {
+          const randomX = typeof window !== 'undefined' ? Math.random() * window.innerWidth : Math.random() * 1920;
+          const randomY = typeof window !== 'undefined' ? Math.random() * window.innerHeight : Math.random() * 1080;
+          return (
+            <motion.div
+              key={i}
+              className="absolute w-2 h-2 bg-white/20 rounded-full"
+              initial={{
+                x: randomX,
+                y: randomY,
+              }}
+              animate={{
+                y: [null, typeof window !== 'undefined' ? Math.random() * window.innerHeight : Math.random() * 1080],
+                x: [null, typeof window !== 'undefined' ? Math.random() * window.innerWidth : Math.random() * 1920],
+              }}
+              transition={{
+                duration: Math.random() * 10 + 10,
+                repeat: Infinity,
+                repeatType: 'reverse' as const,
+                ease: 'linear',
+              }}
+            />
+          );
+        })}
       </div>
 
       {/* Header with India Flag Emblem */}
