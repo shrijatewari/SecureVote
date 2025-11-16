@@ -24,6 +24,8 @@ export default function VoterRegistration() {
     aadhaar_number: '',
     email: '',
     mobile_number: '',
+    password: '',
+    confirmPassword: '',
     father_name: '',
     mother_name: '',
     gender: 'Male',
@@ -136,6 +138,32 @@ export default function VoterRegistration() {
 
     if (!formData.pin_code || !/^\d{6}$/.test(formData.pin_code)) {
       setError('Valid 6-digit PIN code is required');
+      return false;
+    }
+
+    // Password validation
+    if (!formData.password || formData.password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return false;
+    }
+
+    if (!/(?=.*[a-z])/.test(formData.password)) {
+      setError('Password must contain at least one lowercase letter');
+      return false;
+    }
+
+    if (!/(?=.*[A-Z])/.test(formData.password)) {
+      setError('Password must contain at least one uppercase letter');
+      return false;
+    }
+
+    if (!/(?=.*\d)/.test(formData.password)) {
+      setError('Password must contain at least one number');
+      return false;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
       return false;
     }
 
@@ -808,6 +836,48 @@ export default function VoterRegistration() {
                     required
                   />
                   <p className="text-xs text-gray-500 mt-1">We'll send an OTP to verify this number</p>
+                </div>
+              </div>
+
+              {/* Password Section */}
+              <div className="border-b border-gray-200 pb-6">
+                <h2 className="text-xl font-semibold text-gray-800 mb-4">Account Security</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Password <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      name="password"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Minimum 8 characters"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Must contain uppercase, lowercase, and number
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Confirm Password <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Re-enter password"
+                      required
+                    />
+                    {formData.password && formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                      <p className="text-xs text-red-500 mt-1">Passwords do not match</p>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

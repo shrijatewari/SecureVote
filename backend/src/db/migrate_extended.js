@@ -258,7 +258,7 @@ async function runExtendedMigrations() {
     `);
     console.log('✅ Table: grievance_attachments created');
 
-    // Create users table (for admin roles)
+    // Create users table (for admin roles and citizen accounts)
     await connection.query(`
       CREATE TABLE IF NOT EXISTS users (
         user_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -266,6 +266,7 @@ async function runExtendedMigrations() {
         email VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
         role ENUM('citizen', 'blo', 'ero', 'deo', 'ceo', 'eci') DEFAULT 'citizen',
+        voter_id INT NULL,
         district VARCHAR(255),
         state VARCHAR(255),
         is_active BOOLEAN DEFAULT TRUE,
@@ -274,10 +275,27 @@ async function runExtendedMigrations() {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_username (username),
         INDEX idx_email (email),
-        INDEX idx_role (role)
+        INDEX idx_role (role),
+        INDEX idx_voter_id (voter_id),
+        FOREIGN KEY (voter_id) REFERENCES voters(voter_id) ON DELETE SET NULL
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
     console.log('✅ Table: users created');
+    
+    // Add voter_id column if it doesn't exist (for linking users to voters)
+    try {
+      await connection.query(`
+        ALTER TABLE users 
+        ADD COLUMN IF NOT EXISTS voter_id INT NULL,
+        ADD INDEX IF NOT EXISTS idx_voter_id (voter_id),
+        ADD FOREIGN KEY IF NOT EXISTS (voter_id) REFERENCES voters(voter_id) ON DELETE SET NULL
+      `);
+    } catch (err) {
+      // Column might already exist, ignore error
+      if (!err.message.includes('Duplicate column')) {
+        console.warn('⚠️  Could not add voter_id column:', err.message);
+      }
+    }
 
     // Create otp_verifications table
     await connection.query(`

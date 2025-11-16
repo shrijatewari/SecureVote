@@ -149,9 +149,52 @@ class VoterService {
         const query = `INSERT INTO voters (${fields.join(', ')}) VALUES (${placeholders})`;
         
         const [result] = await connection.query(query, values);
+        const voterId = result.insertId;
+        
+        // Create user account with password if password is provided
+        if (voterData.password && voterData.email) {
+          try {
+            const bcrypt = require('bcryptjs');
+            const passwordHash = await bcrypt.hash(voterData.password, 10);
+            const username = voterData.email.split('@')[0]; // Use email prefix as username
+            
+            // Check if voter_id column exists in users table
+            const [columns] = await connection.query(
+              `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+               WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'voter_id'`
+            );
+            
+            if (columns.length > 0) {
+              // voter_id column exists - link user to voter
+              await connection.query(
+                `INSERT INTO users (username, email, password_hash, role, voter_id, district, state, created_at)
+                 VALUES (?, ?, ?, 'citizen', ?, ?, ?, NOW())
+                 ON DUPLICATE KEY UPDATE
+                 password_hash = VALUES(password_hash),
+                 role = VALUES(role),
+                 voter_id = VALUES(voter_id)`,
+                [username, normalizedEmail, passwordHash, voterId, voterData.district || null, voterData.state || null]
+              );
+            } else {
+              // voter_id column doesn't exist - create without linking
+              await connection.query(
+                `INSERT INTO users (username, email, password_hash, role, district, state, created_at)
+                 VALUES (?, ?, ?, 'citizen', ?, ?, NOW())
+                 ON DUPLICATE KEY UPDATE
+                 password_hash = VALUES(password_hash),
+                 role = VALUES(role)`,
+                [username, normalizedEmail, passwordHash, voterData.district || null, voterData.state || null]
+              );
+            }
+            
+            console.log('✅ User account created for voter:', voterId);
+          } catch (userErr) {
+            // Log error but don't fail voter registration if user creation fails
+            console.warn('⚠️  User account creation failed (non-critical):', userErr.message);
+          }
+        }
         
         await connection.commit();
-        const voterId = result.insertId;
         connection.release();
         
         console.log('✅ Voter created successfully with ID:', voterId);
