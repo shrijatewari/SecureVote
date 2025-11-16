@@ -11,51 +11,72 @@ class VoterService {
         await connection.query('SET innodb_lock_wait_timeout = 10');
         await connection.beginTransaction();
 
-        // Check for duplicate email (only if email is provided and not empty)
+        // BIOMETRIC-BASED DUPLICATE DETECTION
+        // Only block registration if face_hash or fingerprint_hash matches (same person)
+        // Allow email/mobile/Aadhaar duplicates - they will be flagged by AI duplicate detection later
+        
         const normalizedEmail = voterData.email ? voterData.email.toLowerCase().trim() : null;
+        const normalizedMobile = voterData.mobile_number ? voterData.mobile_number.trim() : null;
+        const normalizedAadhaar = voterData.aadhaar_number ? voterData.aadhaar_number.trim() : null;
+        
+        // Check for biometric duplicates (face_hash or fingerprint_hash)
+        const faceHash = voterData.face_embedding_hash || null;
+        const fingerprintHash = voterData.fingerprint_hash || null;
+        
+        if (faceHash || fingerprintHash) {
+          let biometricQuery = 'SELECT b.voter_id, v.name, v.aadhaar_number, v.email FROM biometrics b JOIN voters v ON b.voter_id = v.voter_id WHERE ';
+          const biometricParams = [];
+          
+          if (faceHash && fingerprintHash) {
+            biometricQuery += '(b.face_hash = ? OR b.fingerprint_hash = ?)';
+            biometricParams.push(faceHash, fingerprintHash);
+          } else if (faceHash) {
+            biometricQuery += 'b.face_hash = ?';
+            biometricParams.push(faceHash);
+          } else if (fingerprintHash) {
+            biometricQuery += 'b.fingerprint_hash = ?';
+            biometricParams.push(fingerprintHash);
+          }
+          
+          if (biometricParams.length > 0) {
+            const [existingBiometric] = await connection.query(biometricQuery, biometricParams);
+            if (existingBiometric.length > 0) {
+              await connection.rollback();
+              connection.release();
+              const existing = existingBiometric[0];
+              throw new Error(`DUPLICATE BIOMETRIC DETECTED! This face/fingerprint already belongs to Voter ID: ${existing.voter_id}, Name: ${existing.name}, Aadhaar: ${existing.aadhaar_number}. You cannot register the same person twice.`);
+            }
+          }
+        }
+        
+        // Log warnings for email/mobile/Aadhaar matches (but don't block)
         if (normalizedEmail && normalizedEmail.length > 0 && normalizedEmail !== 'null' && normalizedEmail !== 'undefined') {
-          console.log('Checking duplicate email:', normalizedEmail);
           const [existingEmail] = await connection.query(
-            'SELECT voter_id, name, aadhaar_number FROM voters WHERE email = ? AND email IS NOT NULL AND email != "" AND email != "null" LIMIT 1',
+            'SELECT voter_id, name, aadhaar_number FROM voters WHERE email = ? AND email IS NOT NULL AND email != "" LIMIT 1',
             [normalizedEmail]
           );
-          console.log('Email check result:', existingEmail.length, existingEmail);
           if (existingEmail.length > 0) {
-            await connection.rollback();
-            connection.release();
-            throw new Error(`Email ${normalizedEmail} is already registered with Voter ID: ${existingEmail[0].voter_id}, Name: ${existingEmail[0].name}, Aadhaar: ${existingEmail[0].aadhaar_number}`);
+            console.warn(`⚠️  Email ${normalizedEmail} already exists (Voter ID: ${existingEmail[0].voter_id}), but allowing registration - will be flagged by AI duplicate detection`);
           }
         }
 
-        // Check for duplicate mobile (only if mobile is provided and not empty)
-        const normalizedMobile = voterData.mobile_number ? voterData.mobile_number.trim() : null;
         if (normalizedMobile && normalizedMobile.length > 0 && normalizedMobile !== 'null' && normalizedMobile !== 'undefined') {
-          console.log('Checking duplicate mobile:', normalizedMobile);
           const [existingMobile] = await connection.query(
-            'SELECT voter_id, name, aadhaar_number FROM voters WHERE mobile_number = ? AND mobile_number IS NOT NULL AND mobile_number != "" AND mobile_number != "null" LIMIT 1',
+            'SELECT voter_id, name, aadhaar_number FROM voters WHERE mobile_number = ? AND mobile_number IS NOT NULL AND mobile_number != "" LIMIT 1',
             [normalizedMobile]
           );
-          console.log('Mobile check result:', existingMobile.length, existingMobile);
           if (existingMobile.length > 0) {
-            await connection.rollback();
-            connection.release();
-            throw new Error(`Mobile number ${normalizedMobile} is already registered with Voter ID: ${existingMobile[0].voter_id}, Name: ${existingMobile[0].name}, Aadhaar: ${existingMobile[0].aadhaar_number}`);
+            console.warn(`⚠️  Mobile ${normalizedMobile} already exists (Voter ID: ${existingMobile[0].voter_id}), but allowing registration - will be flagged by AI duplicate detection`);
           }
         }
 
-        // Check for duplicate Aadhaar (Aadhaar is always required, so always check)
-        if (voterData.aadhaar_number && voterData.aadhaar_number.trim().length > 0) {
-          const normalizedAadhaar = voterData.aadhaar_number.trim();
-          console.log('Checking duplicate Aadhaar:', normalizedAadhaar);
+        if (normalizedAadhaar && normalizedAadhaar.length > 0) {
           const [existingAadhaar] = await connection.query(
-            'SELECT voter_id, name, email, mobile_number FROM voters WHERE aadhaar_number = ? LIMIT 1',
+            'SELECT voter_id, name, email FROM voters WHERE aadhaar_number = ? LIMIT 1',
             [normalizedAadhaar]
           );
-          console.log('Aadhaar check result:', existingAadhaar.length, existingAadhaar);
           if (existingAadhaar.length > 0) {
-            await connection.rollback();
-            connection.release();
-            throw new Error(`Aadhaar number ${normalizedAadhaar} is already registered with Voter ID: ${existingAadhaar[0].voter_id}, Name: ${existingAadhaar[0].name}, Email: ${existingAadhaar[0].email}, Mobile: ${existingAadhaar[0].mobile_number}`);
+            console.warn(`⚠️  Aadhaar ${normalizedAadhaar} already exists (Voter ID: ${existingAadhaar[0].voter_id}), but allowing registration - will be flagged by AI duplicate detection`);
           }
         }
 
