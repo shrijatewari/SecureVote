@@ -97,14 +97,13 @@ async function seedElections() {
         
         if (existing.length === 0) {
           await connection.query(
-            `INSERT INTO elections (title, start_date, end_date, status, description) 
-             VALUES (?, ?, ?, ?, ?)`,
+            `INSERT INTO elections (title, start_date, end_date, status) 
+             VALUES (?, ?, ?, ?)`,
             [
               election.title,
               election.start_date,
               election.end_date,
-              election.status,
-              election.description || null
+              election.status
             ]
           );
           count++;
