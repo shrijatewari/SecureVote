@@ -55,22 +55,18 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
-      callback(null, true);
-    } else {
-      // Allow localhost on any port for development
-      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
+    // Allow localhost on any port for development
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      return callback(null, true);
     }
-  },
-  credentials: true,
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true); // allow curl/postman
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(null, true); // permissive during development; tighten if needed
+    
+    // Check allowed origins
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    
+    // Permissive during development
+    return callback(null, true);
   },
   credentials: true,
   methods: ['GET','POST','PUT','DELETE','OPTIONS'],
