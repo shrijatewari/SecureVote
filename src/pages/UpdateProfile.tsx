@@ -48,6 +48,7 @@ export default function UpdateProfile() {
   const [showOTPModal, setShowOTPModal] = useState(false);
   const [otpType, setOtpType] = useState<'mobile' | 'email' | 'aadhaar'>('mobile');
   const [biometricData, setBiometricData] = useState<any>(null);
+  const [lastSavedSection, setLastSavedSection] = useState<string | null>(null);
   const { t } = useTranslation();
 
   useEffect(() => {
@@ -259,7 +260,43 @@ export default function UpdateProfile() {
       if (response.data.success) {
         setProfile(response.data.data);
         await loadProfile();
-        alert('✅ Profile updated successfully!');
+        
+        // Track which section was saved
+        if (section) {
+          setLastSavedSection(section);
+          // Reload completion status to check if profile is 100% complete
+          try {
+            const voterId = profile.voter_id;
+            const updatedCompletionRes = await profileService.getCompletionStatus(voterId);
+            const updatedCompletion = updatedCompletionRes.data?.data;
+            
+            if (updatedCompletion?.completionPercentage >= 100) {
+              // Only show success alert when profile is 100% complete
+              setTimeout(() => {
+                alert('✅ Profile updated successfully! All sections are now complete.');
+              }, 300);
+            }
+            // Otherwise, just show the checkmark in sidebar (no alert)
+          } catch (e) {
+            console.warn('Failed to check completion status:', e);
+          }
+        } else {
+          // If no specific section, check completion
+          try {
+            const voterId = profile.voter_id;
+            const updatedCompletionRes = await profileService.getCompletionStatus(voterId);
+            const updatedCompletion = updatedCompletionRes.data?.data;
+            
+            if (updatedCompletion?.completionPercentage >= 100) {
+              setTimeout(() => {
+                alert('✅ Profile updated successfully! All sections are now complete.');
+              }, 300);
+            }
+            // Otherwise, no alert for partial updates
+          } catch (e) {
+            console.warn('Failed to check completion status:', e);
+          }
+        }
       } else {
         throw new Error(response.data.error || 'Update failed');
       }
@@ -326,6 +363,70 @@ export default function UpdateProfile() {
     if (percentage < 80) return 'bg-yellow-500';
     return 'bg-green-500';
   };
+
+  // Check if a section is completed based on profile data and completion checkpoints
+  const isSectionCompleted = (sectionId: string): boolean => {
+    if (!profile || !completion) return false;
+    
+    const checkpoints = completion.checkpoints || {};
+    
+    switch (sectionId) {
+      case 'personal':
+        return checkpoints.personal_info === true || (
+          profile.name && profile.gender && profile.dob && profile.father_name
+        );
+      case 'contact':
+        return (checkpoints.email_otp === true && checkpoints.mobile_otp === true) || (
+          profile.email_verified && profile.mobile_verified
+        );
+      case 'address':
+        return checkpoints.address_doc === true || (
+          profile.house_number && profile.street && profile.village_city && 
+          profile.district && profile.state && profile.pin_code
+        );
+      case 'identification':
+        return checkpoints.aadhaar_otp === true || profile.aadhaar_number;
+      case 'demographic':
+        return profile.education_level && profile.occupation;
+      case 'family':
+        return checkpoints.family_linking === true;
+      case 'biometric':
+        return checkpoints.biometrics === true || profile.biometric_hash;
+      case 'documents':
+        return checkpoints.address_doc === true || profile.address_proof_url;
+      case 'voter':
+        return profile.epic_number || profile.polling_station_id;
+      case 'nri':
+        return profile.is_nri === false || (profile.is_nri === true && profile.country_of_residence);
+      case 'security':
+        return profile.two_factor_enabled !== undefined;
+      case 'notifications':
+        return profile.receive_sms_updates !== undefined || profile.receive_email_updates !== undefined;
+      case 'consent':
+        return profile.consent_indian_citizen === true && profile.consent_details_correct === true;
+      case 'review':
+        return (completion.completionPercentage || 0) >= 100;
+      default:
+        return false;
+    }
+  };
+
+  const sections = [
+    { id: 'personal', name: 'Personal Details', icon: '👤' },
+    { id: 'contact', name: 'Contact Details', icon: '📞' },
+    { id: 'address', name: 'Address Details', icon: '📍' },
+    { id: 'identification', name: 'Identification', icon: '🆔' },
+    { id: 'demographic', name: 'Demographics', icon: '📊' },
+    { id: 'family', name: 'Family & Household', icon: '👨‍👩‍👧‍👦' },
+    { id: 'voter', name: 'Voter-Specific', icon: '🗳️' },
+    { id: 'documents', name: 'Documents', icon: '📄' },
+    { id: 'biometric', name: 'Biometrics', icon: '🔐' },
+    { id: 'nri', name: 'NRI Details', icon: '🌍' },
+    { id: 'security', name: 'Security Settings', icon: '🔒' },
+    { id: 'notifications', name: 'Notifications', icon: '🔔' },
+    { id: 'consent', name: 'Consent & Declarations', icon: '✅' },
+    { id: 'review', name: 'Review & Submit', icon: '📋' },
+  ];
 
   if (loading) {
     return (
@@ -405,20 +506,45 @@ export default function UpdateProfile() {
             <div className="card sticky top-4">
               <h3 className="font-bold text-gray-800 mb-4">Sections</h3>
               <nav className="space-y-2">
-                {sections.map((section) => (
-                  <button
-                    key={section.id}
-                    onClick={() => setActiveSection(section.id)}
-                    className={`w-full text-left px-4 py-2 rounded-lg transition ${
-                      activeSection === section.id
-                        ? 'bg-primary-navy text-white'
-                        : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <span className="mr-2">{section.icon}</span>
-                    {section.name}
-                  </button>
-                ))}
+                {sections.map((section) => {
+                  const isCompleted = isSectionCompleted(section.id);
+                  const isActive = activeSection === section.id;
+                  const justSaved = lastSavedSection === section.id;
+                  
+                  return (
+                    <button
+                      key={section.id}
+                      onClick={() => {
+                        setActiveSection(section.id);
+                        setLastSavedSection(null); // Clear saved indicator when switching sections
+                      }}
+                      className={`w-full text-left px-4 py-2 rounded-lg transition relative ${
+                        isActive
+                          ? 'bg-primary-navy text-white'
+                          : isCompleted
+                          ? 'bg-green-50 text-gray-700 hover:bg-green-100 border-l-4 border-green-500'
+                          : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <span className="mr-2">{section.icon}</span>
+                          <span>{section.name}</span>
+                        </div>
+                        {isCompleted && (
+                          <span className={`ml-2 ${isActive ? 'text-white' : 'text-green-600'}`}>
+                            ✓
+                          </span>
+                        )}
+                        {justSaved && !isCompleted && (
+                          <span className="ml-2 text-xs text-blue-600 animate-pulse">
+                            Saved
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </nav>
             </div>
           </div>
