@@ -185,6 +185,12 @@ app.use((req, res) => {
 // Error handler (must be last)
 app.use(errorHandler);
 
+// Ensure users are seeded on startup
+const ensureUsersSeeded = require('./db/ensure_users_seeded');
+ensureUsersSeeded().catch(err => {
+  console.error('⚠️  Warning: Could not seed users:', err.message);
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);

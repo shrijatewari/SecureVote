@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import LanguageSelector from '../components/LanguageSelector';
 import { authService } from '../services/api';
 
-export default function LoginPage({ setUser, setIsAdmin }: any) {
+export default function LoginPage({ setUser, setIsAdmin }: { setUser: (user: any) => void; setIsAdmin?: (isAdmin: boolean) => void }) {
   const { t } = useTranslation();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
@@ -30,10 +30,19 @@ export default function LoginPage({ setUser, setIsAdmin }: any) {
       localStorage.setItem('auth_token', token);
       localStorage.setItem('user_data', JSON.stringify(userData));
       setUser(userData);
-      // Treat non-citizen roles as admin (eci/ceo/deo/ero/blo/admin)
-      const isAdminRole = userData.role && userData.role.toLowerCase() !== 'citizen';
-      setIsAdmin(isAdminRole);
-      navigate(isAdminRole ? '/admin' : '/dashboard');
+      
+      // Redirect based on role
+      const role = (userData.role || 'citizen').toLowerCase();
+      const isAdminRole = role !== 'citizen';
+      if (setIsAdmin) {
+        setIsAdmin(isAdminRole);
+      }
+      
+      if (isAdminRole) {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       console.error('Login error:', err);
       let errorMsg = 'Login failed. Please try again.';

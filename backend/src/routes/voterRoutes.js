@@ -3,24 +3,24 @@ const router = express.Router();
 const voterController = require('../controllers/voterController');
 const { validateVoterRegistration } = require('../middleware/voterValidation');
 const { validate, biometricVerificationSchema } = require('../utils/validation');
-// const { authenticateToken } = require('../middleware/auth');
+const { requireMinimumRole, requirePermission } = require('../middleware/rbac');
 
-// POST /voters - Register new voter (with enhanced validation)
+// POST /voters - Register new voter (public - anyone can register)
 router.post('/', validateVoterRegistration, voterController.createVoter);
 
-// GET /voters/:id
-router.get('/:id', voterController.getVoterById);
+// GET /voters/:id - Read voter (requires admin role minimum)
+router.get('/:id', requireMinimumRole('admin'), voterController.getVoterById);
 
-// GET /voters
-router.get('/', voterController.getAllVoters);
+// GET /voters - List voters (requires admin role minimum)
+router.get('/', requireMinimumRole('admin'), voterController.getAllVoters);
 
-// PUT /voters/:id
-router.put('/:id', voterController.updateVoter);
+// PUT /voters/:id - Update voter (requires admin role minimum)
+router.put('/:id', requireMinimumRole('admin'), voterController.updateVoter);
 
-// DELETE /voters/:id
-router.delete('/:id', voterController.deleteVoter);
+// DELETE /voters/:id - Delete voter (requires deo role minimum)
+router.delete('/:id', requireMinimumRole('deo'), voterController.deleteVoter);
 
-// POST /voters/verify-biometric
+// POST /voters/verify-biometric - Verify biometric (public for registration)
 router.post('/verify-biometric', validate(biometricVerificationSchema), voterController.verifyBiometric);
 
 module.exports = router;

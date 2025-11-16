@@ -36,28 +36,78 @@ import EPICManagement from './pages/admin/EPICManagement';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
+// Role hierarchy for frontend
+const ROLE_HIERARCHY: { [key: string]: number } = {
+  citizen: 1,
+  admin: 2,
+  blo: 3,
+  ero: 4,
+  deo: 5,
+  ceo: 6,
+  eci: 7
+};
+
+function hasMinimumRole(userRole: string, minimumRole: string): boolean {
+  const userLevel = ROLE_HIERARCHY[userRole?.toLowerCase()] || 1;
+  const minLevel = ROLE_HIERARCHY[minimumRole?.toLowerCase()] || 1;
+  return userLevel >= minLevel;
+}
+
+function isAdminRole(role: string): boolean {
+  return role && role.toLowerCase() !== 'citizen';
+}
+
 function App() {
   const [user, setUser] = useState<any>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState<string>('citizen');
 
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
     const userData = localStorage.getItem('user_data');
     if (token && userData) {
-      const parsed = JSON.parse(userData);
-      setUser(parsed);
-      // Consider any non-citizen role as admin access
-      setIsAdmin(parsed.role && parsed.role.toLowerCase() !== 'citizen');
+      try {
+        const parsed = JSON.parse(userData);
+        setUser(parsed);
+        const role = (parsed.role || 'citizen').toLowerCase();
+        setUserRole(role);
+      } catch (e) {
+        console.error('Error parsing user data:', e);
+      }
     }
   }, []);
 
-  const ProtectedRoute = ({ children, adminOnly = false }: { children: JSX.Element; adminOnly?: boolean }) => {
+  const ProtectedRoute = ({ 
+    children, 
+    adminOnly = false, 
+    minimumRole = 'citizen',
+    allowedRoles 
+  }: { 
+    children: JSX.Element; 
+    adminOnly?: boolean;
+    minimumRole?: string;
+    allowedRoles?: string[];
+  }) => {
     if (!user) {
       return <Navigate to="/login" />;
     }
-    if (adminOnly && !isAdmin) {
+    
+    const role = userRole.toLowerCase();
+    
+    // Check if admin access required
+    if (adminOnly && !isAdminRole(role)) {
       return <Navigate to="/dashboard" />;
     }
+    
+    // Check if specific roles are allowed
+    if (allowedRoles && !allowedRoles.includes(role)) {
+      return <Navigate to="/dashboard" />;
+    }
+    
+    // Check minimum role requirement
+    if (!hasMinimumRole(role, minimumRole)) {
+      return <Navigate to="/dashboard" />;
+    }
+    
     return children;
   };
 
@@ -66,7 +116,11 @@ function App() {
       <Routes>
         <Route path="/" element={<EnhancedLandingPage />} />
         <Route path="/old-landing" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage setUser={setUser} setIsAdmin={setIsAdmin} />} />
+        <Route path="/login" element={<LoginPage setUser={(userData: any) => {
+          setUser(userData);
+          const role = (userData?.role || 'citizen').toLowerCase();
+          setUserRole(role);
+        }} />} />
         
         <Route
           path="/dashboard"
@@ -80,17 +134,17 @@ function App() {
         <Route
           path="/admin"
           element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute adminOnly minimumRole="admin">
               <AdminDashboard />
             </ProtectedRoute>
           }
         />
         
-        {/* Admin Module Routes */}
+        {/* Admin Module Routes - Tiered Access */}
         <Route
           path="/admin/voters"
           element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute adminOnly minimumRole="admin">
               <VoterManagement />
             </ProtectedRoute>
           }
@@ -98,7 +152,7 @@ function App() {
         <Route
           path="/admin/revision"
           element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute adminOnly minimumRole="deo">
               <RollRevision />
             </ProtectedRoute>
           }
@@ -106,7 +160,7 @@ function App() {
         <Route
           path="/admin/ai-services"
           element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute adminOnly minimumRole="deo">
               <AIServicesDashboard />
             </ProtectedRoute>
           }
@@ -114,7 +168,7 @@ function App() {
         <Route
           path="/admin/grievances"
           element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute adminOnly minimumRole="admin">
               <GrievanceManagement />
             </ProtectedRoute>
           }
@@ -122,7 +176,7 @@ function App() {
         <Route
           path="/admin/epic"
           element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute adminOnly minimumRole="ero">
               <EPICManagement />
             </ProtectedRoute>
           }
@@ -198,11 +252,11 @@ function App() {
           }
         />
         
-        {/* Admin Features */}
+        {/* Admin Features - Tiered Access */}
         <Route
           path="/admin/duplicates"
           element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute adminOnly minimumRole="deo">
               <DuplicateDetectionDashboard />
             </ProtectedRoute>
           }
@@ -210,7 +264,7 @@ function App() {
         <Route
           path="/admin/death-records"
           element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute adminOnly minimumRole="deo">
               <DeathRecordSyncDashboard />
             </ProtectedRoute>
           }
@@ -218,7 +272,7 @@ function App() {
         <Route
           path="/admin/blo-tasks"
           element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute adminOnly minimumRole="blo" allowedRoles={['blo', 'ero', 'deo', 'ceo', 'eci']}>
               <BLOTaskDashboard />
             </ProtectedRoute>
           }
@@ -226,7 +280,7 @@ function App() {
         <Route
           path="/admin/transparency"
           element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute adminOnly minimumRole="admin">
               <TransparencyPortal />
             </ProtectedRoute>
           }
@@ -234,7 +288,7 @@ function App() {
         <Route
           path="/admin/data-import"
           element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute adminOnly minimumRole="ceo">
               <DataImportDashboard />
             </ProtectedRoute>
           }
@@ -242,7 +296,7 @@ function App() {
         <Route
           path="/admin/security"
           element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute adminOnly minimumRole="ceo">
               <SecuritySIEMDashboard />
             </ProtectedRoute>
           }
@@ -250,7 +304,7 @@ function App() {
         <Route
           path="/admin/ledger"
           element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute adminOnly minimumRole="ceo">
               <LedgerVerificationPage />
             </ProtectedRoute>
           }

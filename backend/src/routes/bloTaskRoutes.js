@@ -1,25 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const bloTaskController = require('../controllers/bloTaskController');
-const { authenticateToken } = require('../middleware/auth');
+const { requireMinimumRole, requirePermission } = require('../middleware/rbac');
 
-// All routes require authentication
-router.use(authenticateToken);
+// POST /tasks/assign - Assign task (requires ero role minimum)
+router.post('/assign', requireMinimumRole('ero'), bloTaskController.assignTask);
 
-// POST /tasks/assign
-router.post('/assign', bloTaskController.assignTask);
+// GET /tasks/blo/:blo_id - Get BLO tasks (requires blo role minimum)
+router.get('/blo/:blo_id', requireMinimumRole('blo'), bloTaskController.getBLOTasks);
 
-// GET /tasks/blo/:blo_id
-router.get('/blo/:blo_id', bloTaskController.getBLOTasks);
+// GET /tasks/status/:status - Get tasks by status (requires admin role minimum)
+router.get('/status/:status', requireMinimumRole('admin'), bloTaskController.getTasksByStatus);
 
-// GET /tasks/status/:status
-router.get('/status/:status', bloTaskController.getTasksByStatus);
+// GET /tasks/:id - Get task by ID (requires blo role minimum)
+router.get('/:id', requireMinimumRole('blo'), bloTaskController.getTaskById);
 
-// GET /tasks/:id
-router.get('/:id', bloTaskController.getTaskById);
-
-// POST /tasks/:task_id/submit
-router.post('/:task_id/submit', bloTaskController.submitTask);
+// POST /tasks/:task_id/submit - Submit task (requires blo role minimum)
+router.post('/:task_id/submit', requireMinimumRole('blo'), bloTaskController.submitTask);
 
 module.exports = router;
 
