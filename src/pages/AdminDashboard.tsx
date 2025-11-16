@@ -60,10 +60,17 @@ export default function AdminDashboard() {
       try {
         const parsed = JSON.parse(userData);
         const role = (parsed.role || 'CITIZEN').toUpperCase();
+        const permissions = parsed.permissions || [];
         console.log('🔍 Loaded user role:', role);
-        console.log('🔍 Loaded permissions:', parsed.permissions || []);
+        console.log('🔍 Loaded permissions:', permissions);
+        console.log('🔍 Permissions count:', permissions.length);
         setUserRole(role);
-        setUserPermissions(parsed.permissions || []);
+        setUserPermissions(permissions);
+        
+        // If no permissions loaded, log warning
+        if (permissions.length === 0 && role !== 'CITIZEN') {
+          console.warn('⚠️ No permissions loaded for role:', role, '- Using role-based fallback');
+        }
       } catch (e) {
         console.error('Error parsing user data:', e);
       }
@@ -71,6 +78,20 @@ export default function AdminDashboard() {
     fetchStats();
     fetchChartData();
   }, []);
+
+  // Role-based permission mapping (fallback if permissions not loaded)
+  const getRolePermissions = (role: string): string[] => {
+    const roleUpper = (role || '').toUpperCase();
+    const rolePermMap: { [key: string]: string[] } = {
+      'BLO': ['dashboard.view', 'voters.view', 'blo_tasks.view', 'blo_tasks.submit', 'biometric.view'],
+      'ERO': ['dashboard.view', 'voters.view', 'voters.edit', 'voters.approve', 'revision.view_flags', 'revision.approve_flags', 'duplicates.view', 'duplicates.resolve', 'death_records.approve', 'death_records.view', 'blo_tasks.view', 'grievances.view', 'grievances.manage', 'documents.view_ocr', 'documents.approve', 'biometric.view', 'biometric.approve', 'epic.view', 'epic.generate'],
+      'DEO': ['dashboard.view', 'ai.view_logs', 'voters.view', 'voters.edit', 'voters.approve', 'voters.assign_blo', 'revision.view_flags', 'revision.approve_flags', 'revision.dry_run', 'duplicates.view', 'duplicates.resolve', 'death_records.upload', 'death_records.approve', 'death_records.view', 'blo_tasks.view', 'blo_tasks.assign', 'grievances.view', 'grievances.manage', 'documents.view_ocr', 'documents.approve', 'biometric.view', 'biometric.approve', 'biometric.compare', 'security.view'],
+      'CEO': ['dashboard.view', 'ai.view_logs', 'ai.change_thresholds', 'ai.retrain', 'voters.view', 'voters.edit', 'voters.approve', 'voters.assign_blo', 'revision.view_flags', 'revision.approve_flags', 'revision.dry_run', 'revision.commit', 'duplicates.view', 'duplicates.resolve', 'death_records.upload', 'death_records.approve', 'death_records.view', 'blo_tasks.view', 'blo_tasks.assign', 'grievances.view', 'grievances.manage', 'documents.view_ocr', 'documents.approve', 'biometric.view', 'biometric.approve', 'biometric.compare', 'security.view', 'security.manage', 'settings.view', 'settings.manage'],
+      'SUPERADMIN': ['*'], // All permissions
+      'ECI': ['*'], // All permissions
+    };
+    return rolePermMap[roleUpper] || [];
+  };
 
   // Check if user has permission
   const hasPermission = (permission: string): boolean => {
@@ -81,13 +102,23 @@ export default function AdminDashboard() {
       return true;
     }
     
+    // Use permissions from localStorage if available, otherwise fallback to role-based
+    const effectivePermissions = userPermissions.length > 0 
+      ? userPermissions 
+      : getRolePermissions(userRole);
+    
+    // Check if wildcard permission exists
+    if (effectivePermissions.includes('*')) {
+      return true;
+    }
+    
     // Check exact permission match
-    if (userPermissions.includes(permission)) {
+    if (effectivePermissions.includes(permission)) {
       return true;
     }
     
     // Check wildcard permissions (e.g., 'voters.*' matches 'voters.view')
-    for (const perm of userPermissions) {
+    for (const perm of effectivePermissions) {
       if (perm.endsWith('.*')) {
         const prefix = perm.replace('.*', '');
         if (permission.startsWith(prefix + '.')) {
