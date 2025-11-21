@@ -35,28 +35,36 @@ export default function LoginPage({ setUser, setIsAdmin }: { setUser: (user: any
       const role = (userData.role || 'citizen').toLowerCase();
       const roleUpper = (userData.role || 'citizen').toUpperCase();
       
-      // Check if admin role (ECI, SUPERADMIN, ADMIN, DEO, CEO, ERO, BLO)
-      const isAdminRole = role !== 'citizen' || 
-                         roleUpper === 'ECI' || 
-                         roleUpper === 'SUPERADMIN' || 
-                         roleUpper === 'ADMIN' ||
-                         roleUpper === 'DEO' ||
-                         roleUpper === 'CEO' ||
-                         roleUpper === 'ERO' ||
-                         roleUpper === 'BLO';
+      // List of all admin roles (superadmin has highest priority)
+      const adminRoles = [
+        'superadmin', 'eci', 'admin', 'ceo', 'deo', 'ero', 'blo', 
+        'cro', 'doc_verifier', 'ai_auditor', 'presiding_officer', 'helpdesk'
+      ];
       
-      // Actually, just check if not citizen
-      const isAdmin = role !== 'citizen';
+      // Check if admin role - explicitly check superadmin first
+      const isAdmin = role === 'superadmin' || 
+                      roleUpper === 'SUPERADMIN' ||
+                      adminRoles.includes(role) ||
+                      role !== 'citizen';
       
       if (setIsAdmin) {
         setIsAdmin(isAdmin);
       }
       
-      console.log('Login redirect:', { role, roleUpper, isAdmin, email: userData.email });
+      console.log('🔐 Login redirect:', { 
+        role, 
+        roleUpper, 
+        isAdmin, 
+        email: userData.email,
+        userData: userData 
+      });
       
+      // Superadmin and all admin roles go to admin dashboard
       if (isAdmin) {
+        console.log('✅ Redirecting to ADMIN dashboard');
         navigate('/admin');
       } else {
+        console.log('✅ Redirecting to CITIZEN dashboard');
         navigate('/dashboard');
       }
     } catch (err: any) {

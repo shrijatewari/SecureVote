@@ -47,17 +47,27 @@ const ROLE_HIERARCHY: { [key: string]: number } = {
   ero: 4,
   deo: 5,
   ceo: 6,
-  eci: 7
+  eci: 7,
+  superadmin: 10  // Highest level
 };
 
 function hasMinimumRole(userRole: string, minimumRole: string): boolean {
   const userLevel = ROLE_HIERARCHY[userRole?.toLowerCase()] || 1;
   const minLevel = ROLE_HIERARCHY[minimumRole?.toLowerCase()] || 1;
+  // Superadmin always passes
+  if (userRole?.toLowerCase() === 'superadmin') {
+    return true;
+  }
   return userLevel >= minLevel;
 }
 
 function isAdminRole(role: string): boolean {
-  return role && role.toLowerCase() !== 'citizen';
+  if (!role) return false;
+  const roleLower = role.toLowerCase();
+  // Superadmin and all non-citizen roles are admin
+  return roleLower === 'superadmin' || 
+         roleLower === 'eci' ||
+         roleLower !== 'citizen';
 }
 
 function App() {
@@ -115,7 +125,13 @@ function App() {
       
       // Check if admin access required
       if (adminOnly && !isAdminRole(role)) {
+        console.log('🚫 Admin access required but user role is:', role);
         return '/dashboard';
+      }
+      
+      // Superadmin always has access to admin routes
+      if (adminOnly && role === 'superadmin') {
+        return null; // Allow access
       }
       
       // Check if specific roles are allowed
