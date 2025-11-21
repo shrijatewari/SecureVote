@@ -41,7 +41,9 @@ export default function AddressFlags() {
     }
 
     try {
-      await validationService.resolveAddressFlag(flag.id, resolutionAction, resolutionNotes);
+      // Use cluster_id if available, otherwise use id
+      const flagId = (flag as any).cluster_id || flag.id;
+      await validationService.resolveAddressFlag(flagId, resolutionAction, resolutionNotes);
       alert('Flag resolved successfully');
       setSelectedFlag(null);
       setResolutionNotes('');

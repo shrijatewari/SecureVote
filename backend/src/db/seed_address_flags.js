@@ -12,10 +12,14 @@ async function seedAddressFlags() {
     console.log('🔍 Seeding address cluster flags...\n');
 
     // Get some voters to create realistic address clusters
+    // Create address_hash from address components if not exists
     const [voters] = await connection.query(
-      `SELECT voter_id, address_hash, district, state, house_number, street, village_city, pin_code
+      `SELECT voter_id, 
+              COALESCE(address_hash, SHA2(CONCAT_WS('|', house_number, street, village_city, district, state, pin_code), 256)) as address_hash,
+              district, state, house_number, street, village_city, pin_code
        FROM voters 
-       WHERE address_hash IS NOT NULL 
+       WHERE (house_number IS NOT NULL OR street IS NOT NULL OR village_city IS NOT NULL)
+         AND district IS NOT NULL
        LIMIT 100`
     );
 
