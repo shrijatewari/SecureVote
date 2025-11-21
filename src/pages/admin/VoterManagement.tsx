@@ -51,52 +51,94 @@ export default function VoterManagement() {
   const fetchVoters = async () => {
     try {
       setLoading(true);
-      const response = await voterService.getAll(page, 20);
-      console.log('Voters API response:', response);
-      console.log('Response data:', response.data);
+      console.log(`🔍 Fetching voters - Page: ${page}, Limit: 20`);
       
-      // Handle different response formats
+      const response = await voterService.getAll(page, 20);
+      console.log('📦 Full API response:', response);
+      console.log('📦 Response.data:', response.data);
+      console.log('📦 Response.data type:', typeof response.data);
+      
+      // Handle different response formats - be very thorough
       let votersData = [];
       let pagination = {};
       
-      if (response.data) {
-        // Check if response.data has voters directly or nested
+      // Check all possible response structures
+      if (response?.data) {
+        // Case 1: response.data is an array directly
         if (Array.isArray(response.data)) {
           votersData = response.data;
-        } else if (response.data.voters) {
+          console.log('✅ Found voters as array in response.data');
+        }
+        // Case 2: response.data.voters exists
+        else if (response.data.voters && Array.isArray(response.data.voters)) {
           votersData = response.data.voters;
           pagination = response.data.pagination || {};
-        } else if (response.data.data && response.data.data.voters) {
+          console.log('✅ Found voters in response.data.voters');
+        }
+        // Case 3: response.data.data.voters (nested)
+        else if (response.data.data?.voters && Array.isArray(response.data.data.voters)) {
           votersData = response.data.data.voters;
           pagination = response.data.data.pagination || {};
-        } else if (response.data.success && response.data.voters) {
+          console.log('✅ Found voters in response.data.data.voters');
+        }
+        // Case 4: response.data.success && response.data.voters
+        else if (response.data.success && response.data.voters && Array.isArray(response.data.voters)) {
           votersData = response.data.voters;
           pagination = response.data.pagination || {};
+          console.log('✅ Found voters in response.data.voters (with success flag)');
         }
-      } else if (response.voters) {
+        // Case 5: Check if response.data itself has voter-like structure
+        else if (response.data && typeof response.data === 'object') {
+          console.log('⚠️  Response.data structure:', Object.keys(response.data));
+          // Try to find any array that might be voters
+          for (const key in response.data) {
+            if (Array.isArray(response.data[key]) && key.toLowerCase().includes('voter')) {
+              votersData = response.data[key];
+              console.log(`✅ Found voters in response.data.${key}`);
+              break;
+            }
+          }
+        }
+      }
+      // Case 6: response.voters directly
+      else if (response?.voters && Array.isArray(response.voters)) {
         votersData = response.voters;
         pagination = response.pagination || {};
+        console.log('✅ Found voters in response.voters');
       }
       
       console.log(`✅ Parsed ${votersData.length} voters from response`);
-      console.log('Pagination:', pagination);
+      console.log('📊 Voters data sample:`, votersData.slice(0, 2));
+      console.log('📊 Pagination:', pagination);
+      
+      if (votersData.length === 0) {
+        console.warn('⚠️  No voters found in response. Full response:', JSON.stringify(response, null, 2));
+      }
       
       setVoters(Array.isArray(votersData) ? votersData : []);
-      setTotalPages(pagination.totalPages || Math.ceil((votersData.length || 0) / 20) || 1);
+      const calculatedPages = pagination.totalPages || Math.ceil((pagination.total || votersData.length || 0) / 20) || 1;
+      setTotalPages(calculatedPages);
+      
+      console.log(`✅ Set ${votersData.length} voters, ${calculatedPages} total pages`);
     } catch (error: any) {
       console.error('❌ Failed to fetch voters:', error);
-      console.error('Error details:', {
+      console.error('❌ Error details:', {
         message: error.message,
         response: error.response?.data,
         status: error.response?.status,
-        url: error.config?.url
+        url: error.config?.url,
+        fullError: error
       });
       
       // Show user-friendly error
       if (error.response?.status === 403) {
-        alert('Access denied. You need "voters.view" permission to view voters.');
+        alert('Access denied. You need "voters.view" permission to view voters. If you are superadmin, make sure backend was restarted.');
       } else if (error.response?.status === 401) {
         alert('Please log in to view voters.');
+      } else if (error.response?.status === 404) {
+        alert('API endpoint not found. Check if backend is running on port 3000.');
+      } else {
+        console.error('Unexpected error:', error);
       }
       
       setVoters([]);
