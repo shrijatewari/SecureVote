@@ -15,21 +15,7 @@ router.post('/verify-biometric', validate(biometricVerificationSchema), voterCon
 // GET /voters - List voters (requires voters.view permission)
 // MUST come before /:id route to avoid matching empty path as ID
 // GET /voters?aadhaar=XXX - Search by Aadhaar (public for landing page)
-router.get('/', (req, res, next) => {
-  // If searching by Aadhaar, allow public access (no auth required)
-  if (req.query.aadhaar) {
-    return voterController.getAllVoters(req, res, next);
-  }
-  // Otherwise require permission and call controller
-  const middleware = requirePermission('voters.view');
-  return middleware[0](req, res, (err) => {
-    if (err) return next(err);
-    return middleware[1](req, res, (err2) => {
-      if (err2) return next(err2);
-      return voterController.getAllVoters(req, res, next);
-    });
-  });
-});
+router.get('/', ...requirePermission('voters.view'), voterController.getAllVoters);
 
 // GET /voters/:id - Read voter (requires voters.view permission)
 // MUST come after / route to avoid matching empty path
