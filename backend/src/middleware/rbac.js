@@ -276,7 +276,20 @@ function requirePermission(permission) {
     async (req, res, next) => {
       const userId = req.user?.id || req.user?.user_id;
       const userRole = req.user?.role?.toUpperCase() || 'CITIZEN';
+      const userRoleLower = req.user?.role?.toLowerCase() || 'citizen';
       const userPermissions = req.user?.permissions || [];
+      
+      // SUPERADMIN always bypasses permission checks
+      if (userRoleLower === 'superadmin' || userRole === 'SUPERADMIN') {
+        console.log(`✅ SUPERADMIN bypassing permission check for: ${permission}`);
+        return next();
+      }
+      
+      // ECI also bypasses (legacy superadmin)
+      if (userRoleLower === 'eci' || userRole === 'ECI') {
+        console.log(`✅ ECI bypassing permission check for: ${permission}`);
+        return next();
+      }
       
       // Check if user has permission in token
       let hasPerm = userPermissions.includes(permission);
