@@ -52,22 +52,53 @@ export default function VoterManagement() {
     try {
       setLoading(true);
       const response = await voterService.getAll(page, 20);
-      console.log('Voters response:', response);
+      console.log('Voters API response:', response);
+      console.log('Response data:', response.data);
       
       // Handle different response formats
-      const votersData = response.data?.voters || response.data?.data?.voters || response.voters || [];
-      const pagination = response.data?.pagination || response.data?.data?.pagination || response.pagination || {};
+      let votersData = [];
+      let pagination = {};
       
-      console.log(`Fetched ${votersData.length} voters`);
+      if (response.data) {
+        // Check if response.data has voters directly or nested
+        if (Array.isArray(response.data)) {
+          votersData = response.data;
+        } else if (response.data.voters) {
+          votersData = response.data.voters;
+          pagination = response.data.pagination || {};
+        } else if (response.data.data && response.data.data.voters) {
+          votersData = response.data.data.voters;
+          pagination = response.data.data.pagination || {};
+        } else if (response.data.success && response.data.voters) {
+          votersData = response.data.voters;
+          pagination = response.data.pagination || {};
+        }
+      } else if (response.voters) {
+        votersData = response.voters;
+        pagination = response.pagination || {};
+      }
+      
+      console.log(`✅ Parsed ${votersData.length} voters from response`);
+      console.log('Pagination:', pagination);
+      
       setVoters(Array.isArray(votersData) ? votersData : []);
-      setTotalPages(pagination.totalPages || 1);
+      setTotalPages(pagination.totalPages || Math.ceil((votersData.length || 0) / 20) || 1);
     } catch (error: any) {
-      console.error('Failed to fetch voters:', error);
+      console.error('❌ Failed to fetch voters:', error);
       console.error('Error details:', {
         message: error.message,
         response: error.response?.data,
-        status: error.response?.status
+        status: error.response?.status,
+        url: error.config?.url
       });
+      
+      // Show user-friendly error
+      if (error.response?.status === 403) {
+        alert('Access denied. You need "voters.view" permission to view voters.');
+      } else if (error.response?.status === 401) {
+        alert('Please log in to view voters.');
+      }
+      
       setVoters([]);
     } finally {
       setLoading(false);

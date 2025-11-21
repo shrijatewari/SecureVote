@@ -110,17 +110,40 @@ export default function DuplicateDetectionDashboard() {
     try {
       setLoading(true);
       const result = await duplicateService.getAll(1, 100, false);
+      console.log('Duplicates API response:', result);
+      console.log('Response data:', result.data);
+      
       // Handle different response formats
-      const duplicatesData = result.data?.duplicates || result.data?.data?.duplicates || result.data || [];
+      let duplicatesData = [];
+      
+      if (result.data) {
+        if (Array.isArray(result.data)) {
+          duplicatesData = result.data;
+        } else if (result.data.duplicates) {
+          duplicatesData = result.data.duplicates;
+        } else if (result.data.data && result.data.data.duplicates) {
+          duplicatesData = result.data.data.duplicates;
+        } else if (result.data.success && result.data.duplicates) {
+          duplicatesData = result.data.duplicates;
+        }
+      } else if (result.duplicates) {
+        duplicatesData = result.duplicates;
+      }
+      
+      console.log(`✅ Parsed ${duplicatesData.length} duplicates from response`);
+      
       if (Array.isArray(duplicatesData)) {
         setDuplicates(duplicatesData);
-      } else if (duplicatesData && typeof duplicatesData === 'object' && duplicatesData.duplicates) {
-        setDuplicates(duplicatesData.duplicates);
       } else {
         setDuplicates([]);
       }
     } catch (err: any) {
-      console.error('Failed to load duplicates:', err);
+      console.error('❌ Failed to load duplicates:', err);
+      console.error('Error details:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      });
       setError(err.response?.data?.error || err.message || 'Failed to load duplicates');
       setDuplicates([]);
     } finally {
