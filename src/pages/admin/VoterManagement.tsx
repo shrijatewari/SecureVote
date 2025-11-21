@@ -108,7 +108,7 @@ export default function VoterManagement() {
       }
       
       console.log(`✅ Parsed ${votersData.length} voters from response`);
-      console.log('📊 Voters data sample:`, votersData.slice(0, 2));
+      console.log('📊 Voters data sample:', votersData.slice(0, 2));
       console.log('📊 Pagination:', pagination);
       
       if (votersData.length === 0) {
