@@ -156,11 +156,22 @@ export default function VoteCastingPage() {
         election_id: Number(electionId),
       });
 
-      alert('Vote cast successfully!');
+      alert('✅ Vote cast successfully! Thank you for participating in the election.');
       navigate('/dashboard');
     } catch (error: any) {
       const errorMsg = error.response?.data?.error || error.message || 'Failed to cast vote';
-      alert(errorMsg);
+      
+      // Check if it's a profile completion error
+      if (errorMsg.includes('Profile incomplete') || errorMsg.includes('incomplete')) {
+        const confirmGoToProfile = confirm(
+          `🚫 Cannot Cast Vote\n\n${errorMsg}\n\nWould you like to complete your profile now?`
+        );
+        if (confirmGoToProfile) {
+          navigate('/update-profile');
+        }
+      } else {
+        alert(`❌ Error: ${errorMsg}`);
+      }
     } finally {
       setSubmitting(false);
     }

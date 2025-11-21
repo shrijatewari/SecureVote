@@ -52,7 +52,19 @@ class VoteService {
           );
           
           if (!allMandatoryComplete || completionData.completionPercentage < 100) {
-            throw new Error('Profile incomplete. All mandatory verifications must be completed before voting.');
+            const incomplete = mandatoryCheckpoints.filter(key => !checkpoints[key]);
+            const incompleteNames = incomplete.map(k => {
+              const names = {
+                'aadhaar_otp': 'Aadhaar OTP Verification',
+                'email_otp': 'Email Verification',
+                'mobile_otp': 'Mobile Verification',
+                'address_doc': 'Address Document',
+                'personal_info': 'Personal Information',
+                'biometrics': 'Biometric Registration'
+              };
+              return names[k] || k.replace('_', ' ');
+            });
+            throw new Error(`Profile incomplete (${completionData.completionPercentage || 0}% complete). Please complete: ${incompleteNames.join(', ')}`);
           }
         }
       } catch (profileError) {
