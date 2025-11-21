@@ -1,12 +1,15 @@
 const pool = require('../config/database');
+const { validateNameAdvanced } = require('../utils/nameValidationAdvanced');
+const { isInDictionary, fuzzyMatch } = require('../utils/indianNamesDictionary');
 
 /**
  * Name Validation Service
  * Validates parent/guardian names for quality and plausibility
+ * Uses multi-layer validation: structural rules, dictionary checks, n-gram models, entropy detection
  */
 class NameValidationService {
   /**
-   * Basic regex and token validation
+   * Basic regex and token validation (Enhanced with advanced checks)
    */
   validateBasicRules(name) {
     if (!name || typeof name !== 'string') {
@@ -16,13 +19,13 @@ class NameValidationService {
     const trimmed = name.trim();
 
     // Minimum length check
-    if (trimmed.length < 4) {
-      return { valid: false, reason: 'Name too short (minimum 4 characters)' };
+    if (trimmed.length < 3) {
+      return { valid: false, reason: 'Name too short (minimum 3 characters)' };
     }
 
     // Maximum length check
-    if (trimmed.length > 100) {
-      return { valid: false, reason: 'Name too long (maximum 100 characters)' };
+    if (trimmed.length > 50) {
+      return { valid: false, reason: 'Name too long (maximum 50 characters)' };
     }
 
     // Check for digits
@@ -47,8 +50,8 @@ class NameValidationService {
     for (const token of tokens) {
       if (token.length > 1) {
         // Check if all characters are the same
-        if (/^(.)\1+$/.test(token)) {
-          return { valid: false, reason: 'Name contains repeated characters' };
+        if (/^(.)\1{3,}$/.test(token)) {
+          return { valid: false, reason: 'Name contains excessive repeated characters' };
         }
 
         // Check for suspicious patterns
@@ -61,8 +64,7 @@ class NameValidationService {
           /^fake/i,
           /^dummy/i,
           /^xyz/i,
-          /^abc/i,
-          /^[a-z]{1,2}[a-z]{1,2}[a-z]{1,2}[a-z]{1,2}$/i  // Pattern like "dfojgoidf"
+          /^abc/i
         ];
 
         for (const pattern of suspiciousPatterns) {
@@ -74,7 +76,7 @@ class NameValidationService {
         // Enhanced: Check for random-looking strings (like "dfojgoidf")
         // If token has no vowels and length > 3, reject
         if (!/[aeiouAEIOU]/.test(token) && token.length > 3) {
-          return { valid: false, reason: 'Name contains invalid characters (no vowels)' };
+          return { valid: false, reason: 'Name contains invalid pattern (no vowels detected)' };
         }
         
         // Check for excessive consonant clusters
@@ -236,7 +238,7 @@ class NameValidationService {
   }
 
   /**
-   * Calculate name quality score
+   * Calculate name quality score (Enhanced with advanced validation)
    */
   async calculateQualityScore(name, nameType = 'first_name') {
     // Start with basic validation
@@ -250,17 +252,40 @@ class NameValidationService {
       };
     }
 
+    // Run advanced validation
+    const advancedCheck = validateNameAdvanced(name, { strict: true });
+    if (!advancedCheck.valid) {
+      return {
+        score: advancedCheck.score,
+        valid: false,
+        reason: advancedCheck.reason || 'Name failed advanced validation',
+        flags: ['advanced_validation_failed'],
+        dictionaryMatches: advancedCheck.dictionaryMatches,
+        fuzzyMatches: advancedCheck.fuzzyMatches,
+        entropy: advancedCheck.entropy,
+        ngramScore: advancedCheck.ngramScore
+      };
+    }
+
     const tokens = name.trim().split(/\s+/).filter(t => t.length > 0);
-    let score = 1.0;
+    let score = advancedCheck.score; // Start with advanced validation score
     const flags = [];
 
-    // Length score (20%)
-    const lengthScore = Math.min(name.length / 20, 1.0) * 0.2;
-    score = score * 0.8 + lengthScore;
-
-    // Token count score (15%)
-    const tokenCountScore = Math.min(tokens.length / 3, 1.0) * 0.15;
-    score = score * 0.85 + tokenCountScore;
+    // Dictionary check boost (if not already counted)
+    let dictionaryScore = 0;
+    let fuzzyScore = 0;
+    for (const token of tokens) {
+      if (isInDictionary(token)) {
+        dictionaryScore += 1.0;
+      } else if (fuzzyMatch(token, 0.85)) {
+        fuzzyScore += 0.8;
+      }
+    }
+    
+    if (tokens.length > 0) {
+      const dictAvg = (dictionaryScore + fuzzyScore) / tokens.length;
+      score = score * 0.7 + dictAvg * 0.3;
+    }
 
     // Phonetic sanity (15%)
     const phoneticCheck = this.checkPhoneticSanity(name);
@@ -269,35 +294,35 @@ class NameValidationService {
       flags.push('phonetic_issues');
     }
 
-    // Dictionary/frequency lookup (30%)
+    // Dictionary/frequency lookup (20%)
     const frequencyScore = await this.lookupNameFrequency(tokens, nameType);
-    score = score * 0.7 + frequencyScore * 0.3;
+    score = score * 0.8 + frequencyScore * 0.2;
 
     // Character distribution (10%)
     const uniqueChars = new Set(name.toLowerCase().replace(/\s/g, '')).size;
     const charDiversityScore = Math.min(uniqueChars / 10, 1.0) * 0.1;
     score = score * 0.9 + charDiversityScore;
 
-    // Check for common patterns (10%)
+    // Check for common patterns (5%)
     const commonPatterns = [
       /^[A-Z]\.\s/, // Initials like "A. Kumar"
       /\s[A-Z]\.$/, // Last initial
     ];
     
-    let patternScore = 0.1;
+    let patternScore = 0.05;
     for (const pattern of commonPatterns) {
       if (pattern.test(name)) {
-        patternScore = 0.1; // Valid pattern
+        patternScore = 0.05; // Valid pattern
         break;
       }
     }
-    score = score * 0.9 + patternScore;
+    score = score * 0.95 + patternScore;
 
     // Final score normalization
     const finalScore = Math.max(0.0, Math.min(1.0, score));
 
     // Determine flags
-    if (finalScore < 0.4) {
+    if (finalScore < 0.5) {
       flags.push('low_quality');
     } else if (finalScore < 0.7) {
       flags.push('medium_quality');
@@ -305,30 +330,86 @@ class NameValidationService {
 
     return {
       score: parseFloat(finalScore.toFixed(2)),
-      valid: finalScore >= 0.4,
+      valid: finalScore >= 0.5,
       flags,
       tokens,
-      soundex: this.soundex(tokens[0] || '')
+      soundex: this.soundex(tokens[0] || ''),
+      dictionaryMatches: advancedCheck.dictionaryMatches,
+      fuzzyMatches: advancedCheck.fuzzyMatches,
+      entropy: advancedCheck.entropy,
+      ngramScore: advancedCheck.ngramScore
     };
   }
 
   /**
-   * Validate name with full pipeline
+   * Validate name with full pipeline (Enhanced with advanced validation)
    */
-  async validateName(name, nameType = 'first_name') {
+  async validateName(name, nameType = 'first_name', options = {}) {
+    // First run basic validation
+    const basicCheck = this.validateBasicRules(name);
+    if (!basicCheck.valid) {
+      return {
+        name,
+        normalized: name.trim(),
+        qualityScore: 0.0,
+        valid: false,
+        flags: ['basic_validation_failed'],
+        reason: basicCheck.reason,
+        soundex: null,
+        tokens: [],
+        validationResult: 'rejected',
+        dictionaryMatches: 0,
+        fuzzyMatches: 0,
+        entropy: 0,
+        ngramScore: 0
+      };
+    }
+
+    // Run advanced validation
+    const advancedCheck = validateNameAdvanced(name, { strict: options.strict !== false });
+    if (!advancedCheck.valid) {
+      return {
+        name,
+        normalized: name.trim(),
+        qualityScore: advancedCheck.score,
+        valid: false,
+        flags: ['advanced_validation_failed'],
+        reason: advancedCheck.reason || 'Name failed advanced validation checks',
+        soundex: this.soundex(name.trim().split(/\s+/)[0] || ''),
+        tokens: name.trim().split(/\s+/).filter(t => t.length > 0),
+        validationResult: 'rejected',
+        dictionaryMatches: advancedCheck.dictionaryMatches,
+        fuzzyMatches: advancedCheck.fuzzyMatches,
+        entropy: advancedCheck.entropy,
+        ngramScore: advancedCheck.ngramScore
+      };
+    }
+
+    // Run quality score calculation (includes dictionary lookup)
     const result = await this.calculateQualityScore(name, nameType);
+    
+    // Determine validation result
+    let validationResult = 'rejected';
+    if (result.score >= 0.7) {
+      validationResult = 'passed';
+    } else if (result.score >= 0.5) {
+      validationResult = 'flagged';
+    }
     
     return {
       name,
       normalized: name.trim(),
       qualityScore: result.score,
-      valid: result.valid,
+      valid: result.valid && validationResult !== 'rejected',
       flags: result.flags,
       reason: result.reason,
       soundex: result.soundex,
       tokens: result.tokens,
-      validationResult: result.score >= 0.8 ? 'passed' : 
-                       result.score >= 0.5 ? 'flagged' : 'rejected'
+      validationResult,
+      dictionaryMatches: result.dictionaryMatches || advancedCheck.dictionaryMatches,
+      fuzzyMatches: result.fuzzyMatches || advancedCheck.fuzzyMatches,
+      entropy: result.entropy || advancedCheck.entropy,
+      ngramScore: result.ngramScore || advancedCheck.ngramScore
     };
   }
 }
