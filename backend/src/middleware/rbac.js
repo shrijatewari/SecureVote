@@ -226,6 +226,11 @@ function requireRole(...allowedRoles) {
       
       const mappedRole = roleMappings[userRole] || userRole;
       
+      // SUPERADMIN always passes (has access to everything)
+      if (userRole === 'SUPERADMIN' || req.user?.role?.toLowerCase() === 'superadmin') {
+        return next();
+      }
+      
       if (!allowedRolesUpper.includes(userRole) && !allowedRolesUpper.includes(mappedRole)) {
         return res.status(403).json({
           error: 'Access denied',
