@@ -433,3 +433,27 @@ export const aiService = {
   healthCheck: () => api.get('/ai/health'),
 };
 
+// OpenAI Service
+export const openaiService = {
+  callEndpoint: (endpoint: string, payload: any) => 
+    api.post(`/ai/openai/${endpoint}`, payload),
+  explainAnomaly: (payload: any) => 
+    api.post('/ai/openai/explain-anomaly', payload),
+  recommendAction: (payload: any) => 
+    api.post('/ai/openai/recommend-action', payload),
+  summarizeSecurity: (payload: any) => 
+    api.post('/ai/openai/summarize-security', payload),
+  explainNameQuality: (payload: any) => 
+    api.post('/ai/openai/name-quality-explain', payload),
+  documentSummary: (payload: any) => 
+    api.post('/ai/openai/document-summary', payload),
+  generateNotice: (payload: any) => 
+    api.post('/ai/openai/generate-notice', payload),
+  debugPrompt: (payload: any) => 
+    api.post('/ai/openai/debug-prompt', payload),
+  getCallHistory: (limit?: number) => 
+    api.get(`/ai/openai/history${limit ? `?limit=${limit}` : ''}`),
+  getCallStats: (hours?: number) => 
+    api.get(`/ai/openai/stats${hours ? `?hours=${hours}` : ''}`),
+};
+

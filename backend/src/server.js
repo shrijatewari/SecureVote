@@ -40,6 +40,7 @@ const aiRoutes = require('./routes/aiRoutes');
 const authRoutes = require('./routes/authRoutes');
 const adminDashboardRoutes = require('./routes/adminDashboardRoutes');
 const validationRoutes = require('./routes/validationRoutes');
+const openaiRoutes = require('./routes/openaiRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -133,6 +134,7 @@ app.use('/api/security', siemRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use('/api/end-to-end', endToEndVerificationRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/ai/openai', openaiRoutes);
 app.use('/api/admin', adminDashboardRoutes);
 app.use('/api/validate', validationRoutes);
 

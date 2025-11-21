@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { duplicateService, mlDuplicateService } from '../services/api';
+import AiExplainPanel from '../components/AiExplainPanel';
 
 export default function DuplicateDetectionDashboard() {
   const [duplicates, setDuplicates] = useState<any[]>([]);
@@ -311,7 +312,18 @@ export default function DuplicateDetectionDashboard() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-2 flex-wrap gap-2">
+                        <AiExplainPanel
+                          issueType="duplicate_voter"
+                          region={dup.district || '[District]'}
+                          sampleCount={1}
+                          aggregatedFlags={[`similarity_${dup.similarity_score || 0}`]}
+                          metrics={{
+                            similarity_score: dup.similarity_score || dup.ensemble_score || 0,
+                            match_fields: dup.match_fields || [],
+                            confidence: dup.confidence || 'medium',
+                          }}
+                        />
                         {hasPermission('duplicates.resolve') ? (
                           <>
                             <button
