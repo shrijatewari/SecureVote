@@ -20,11 +20,14 @@ router.get('/', (req, res, next) => {
   if (req.query.aadhaar) {
     return voterController.getAllVoters(req, res, next);
   }
-  // Otherwise require permission
+  // Otherwise require permission and call controller
   const middleware = requirePermission('voters.view');
   return middleware[0](req, res, (err) => {
     if (err) return next(err);
-    return middleware[1](req, res, next);
+    return middleware[1](req, res, (err2) => {
+      if (err2) return next(err2);
+      return voterController.getAllVoters(req, res, next);
+    });
   });
 });
 
