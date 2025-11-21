@@ -215,13 +215,24 @@ class AddressAnomalyDetectionService {
       const params = [];
 
       if (filters.status) {
-        query += ' AND status = ?';
-        params.push(filters.status);
+        if (filters.status === 'resolved') {
+          query += ' AND reviewed_at IS NOT NULL';
+        } else if (filters.status === 'under_review') {
+          query += ' AND reviewed_by IS NOT NULL AND reviewed_at IS NULL';
+        } else if (filters.status === 'open') {
+          query += ' AND reviewed_at IS NULL';
+        }
       }
 
       if (filters.risk_level) {
-        query += ' AND risk_level = ?';
-        params.push(filters.risk_level);
+        // Map risk_level to is_suspicious and risk_score ranges
+        if (filters.risk_level === 'critical' || filters.risk_level === 'high') {
+          query += ' AND is_suspicious = 1 AND risk_score >= 0.6';
+        } else if (filters.risk_level === 'medium') {
+          query += ' AND (is_suspicious = 1 AND risk_score >= 0.4 AND risk_score < 0.6)';
+        } else if (filters.risk_level === 'low') {
+          query += ' AND (is_suspicious = 0 OR risk_score < 0.4)';
+        }
       }
 
       if (filters.district) {

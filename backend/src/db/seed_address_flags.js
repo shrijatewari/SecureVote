@@ -33,16 +33,43 @@ async function seedAddressFlags() {
     // Group voters by address_hash to find clusters
     const addressGroups = {};
     voters.forEach(voter => {
-      if (!addressGroups[voter.address_hash]) {
-        addressGroups[voter.address_hash] = [];
+      const hash = voter.address_hash;
+      if (!addressGroups[hash]) {
+        addressGroups[hash] = [];
       }
-      addressGroups[voter.address_hash].push(voter);
+      addressGroups[hash].push(voter);
+    });
+
+    // Also group by district+state to create artificial clusters for testing
+    const districtGroups = {};
+    voters.forEach(voter => {
+      const key = `${voter.district || 'Unknown'}_${voter.state || 'Unknown'}`;
+      if (!districtGroups[key]) {
+        districtGroups[key] = [];
+      }
+      districtGroups[key].push(voter);
     });
 
     // Find addresses with multiple voters (clusters)
-    const clusters = Object.entries(addressGroups)
+    let clusters = Object.entries(addressGroups)
       .filter(([hash, voters]) => voters.length >= 3)
-      .slice(0, 15); // Create up to 15 clusters
+      .slice(0, 10);
+
+    // If no natural clusters, create artificial ones from district groups
+    if (clusters.length === 0) {
+      console.log('No natural clusters found. Creating artificial clusters from districts...\n');
+      clusters = Object.entries(districtGroups)
+        .filter(([key, voters]) => voters.length >= 3)
+        .slice(0, 15)
+        .map(([key, voters]) => {
+          // Create a synthetic address hash for this district cluster
+          const firstVoter = voters[0];
+          const syntheticHash = require('crypto').createHash('sha256')
+            .update(`${key}_cluster_${firstVoter.district}`)
+            .digest('hex');
+          return [syntheticHash, voters];
+        });
+    }
 
     let created = 0;
 
