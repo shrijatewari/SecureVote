@@ -96,25 +96,27 @@ async function getAddressFlags(req, res, next) {
     
     const flags = await addressAnomalyService.getAddressFlags(filters);
     
-    // Add AI-generated explanations for each flag
+    // Add AI-generated explanations for each flag (skip if OpenAI not configured)
     const flagsWithExplanations = await Promise.all(
       flags.map(async (flag) => {
         try {
-          const explanation = await openAIService.generateAddressClusterExplanation({
-            voter_count: flag.voter_count,
-            risk_score: flag.risk_score,
-            risk_level: flag.risk_level,
-            surname_diversity_score: flag.surname_diversity_score || 1.0,
-            dob_clustering_score: flag.dob_clustering_score || 1.0,
-            district: flag.district,
-            state: flag.state
-          });
-          return {
-            ...flag,
-            ai_explanation: explanation
-          };
+          // Only try AI if OpenAI service is available
+          if (openAIService && typeof openAIService.generateAddressClusterExplanation === 'function') {
+            const explanation = await openAIService.generateAddressClusterExplanation({
+              voter_count: flag.voter_count,
+              risk_score: flag.risk_score,
+              risk_level: flag.risk_level || 'low',
+              district: flag.district,
+              state: flag.state
+            });
+            return {
+              ...flag,
+              ai_explanation: explanation
+            };
+          }
+          return flag;
         } catch (e) {
-          console.warn('Failed to generate AI explanation for flag:', flag.id, e.message);
+          console.warn('Failed to generate AI explanation for flag:', flag.id || flag.cluster_id, e.message);
           return flag;
         }
       })

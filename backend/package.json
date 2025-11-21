@@ -16,6 +16,7 @@
     "seed:voters": "node src/db/seed_voters.js",
     "seed:duplicates": "node src/db/seed_duplicates.js",
     "seed:superadmin": "node src/db/seed_superadmin.js",
+    "seed:address-flags": "node src/db/seed_address_flags.js",
     "migrate:profile": "node src/db/migrate_profile_extended.js",
     "migrate:reset": "node src/db/migrate.js --reset",
     "migrate:openai": "node src/db/migrate_openai_logs.js",

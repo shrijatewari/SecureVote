@@ -100,11 +100,11 @@ class AddressAnomalyDetectionService {
 
         // Check if flag already exists
         const [existing] = await connection.query(
-          'SELECT id, status FROM address_cluster_flags WHERE address_hash = ?',
+          'SELECT cluster_id, reviewed_at FROM address_cluster_flags WHERE address_hash = ?',
           [cluster.address_hash]
         );
 
-        if (existing.length > 0 && existing[0].status === 'resolved') {
+        if (existing.length > 0 && existing[0].reviewed_at !== null) {
           continue; // Skip resolved flags
         }
 
@@ -114,43 +114,52 @@ class AddressAnomalyDetectionService {
           registration_date: cluster.first_registration
         }));
 
+        // Prepare normalized_address JSON
+        const normalizedAddressJson = JSON.stringify({
+          full: cluster.normalized_address || '',
+          district: cluster.districts?.split(',')[0] || null,
+          state: cluster.states?.split(',')[0] || null,
+          house_number: null,
+          street: null,
+          village_city: null,
+          pin_code: null
+        });
+
+        const isSuspicious = riskLevel === 'high' || riskLevel === 'critical' || riskScore >= 0.6;
+
         if (existing.length > 0) {
           // Update existing flag
           await connection.query(
             `UPDATE address_cluster_flags 
-             SET voter_count = ?, risk_score = ?, risk_level = ?, 
-                 surname_diversity_score = ?, dob_clustering_score = ?,
-                 top_examples = ?, updated_at = NOW()
+             SET voter_count = ?, risk_score = ?, is_suspicious = ?, 
+                 normalized_address = ?
              WHERE address_hash = ?`,
             [
               cluster.voter_count,
               riskScore,
-              riskLevel,
-              surnameDiversityScore,
-              dobClusteringScore,
-              JSON.stringify(topExamples),
+              isSuspicious ? 1 : 0,
+              normalizedAddressJson,
               cluster.address_hash
             ]
           );
         } else {
-          // Create new flag
+          // Create new flag - use address_hash as cluster_id
           await connection.query(
             `INSERT INTO address_cluster_flags 
-             (address_hash, normalized_address, region, district, state, voter_count, 
-              risk_score, risk_level, surname_diversity_score, dob_clustering_score, top_examples)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             (cluster_id, address_hash, normalized_address, voter_count, risk_score, is_suspicious)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE 
+               voter_count = VALUES(voter_count),
+               risk_score = VALUES(risk_score),
+               is_suspicious = VALUES(is_suspicious),
+               normalized_address = VALUES(normalized_address)`,
             [
+              cluster.address_hash.substring(0, 64), // Use hash as cluster_id
               cluster.address_hash,
-              cluster.normalized_address,
-              cluster.districts,
-              cluster.districts.split(',')[0] || null,
-              cluster.states.split(',')[0] || null,
+              normalizedAddressJson,
               cluster.voter_count,
               riskScore,
-              riskLevel,
-              surnameDiversityScore,
-              dobClusteringScore,
-              JSON.stringify(topExamples)
+              isSuspicious ? 1 : 0
             ]
           );
         }
@@ -181,9 +190,25 @@ class AddressAnomalyDetectionService {
     try {
       let query = `
         SELECT 
-          id, address_hash, normalized_address, region, district, state,
-          voter_count, risk_score, risk_level, surname_diversity_score,
-          dob_clustering_score, status, assigned_to, created_at, updated_at
+          cluster_id as id, address_hash, 
+          JSON_UNQUOTE(JSON_EXTRACT(normalized_address, '$.full')) as normalized_address,
+          JSON_UNQUOTE(JSON_EXTRACT(normalized_address, '$.district')) as district,
+          JSON_UNQUOTE(JSON_EXTRACT(normalized_address, '$.state')) as state,
+          voter_count, risk_score, 
+          CASE 
+            WHEN is_suspicious = 1 AND risk_score >= 0.8 THEN 'critical'
+            WHEN is_suspicious = 1 AND risk_score >= 0.6 THEN 'high'
+            WHEN is_suspicious = 1 AND risk_score >= 0.4 THEN 'medium'
+            ELSE 'low'
+          END as risk_level,
+          CASE 
+            WHEN reviewed_at IS NOT NULL THEN 'resolved'
+            WHEN reviewed_by IS NOT NULL THEN 'under_review'
+            ELSE 'open'
+          END as status,
+          reviewed_by as assigned_to,
+          flagged_at as created_at,
+          reviewed_at as updated_at
         FROM address_cluster_flags 
         WHERE 1=1
       `;
@@ -226,7 +251,7 @@ class AddressAnomalyDetectionService {
     const connection = await pool.getConnection();
     try {
       await connection.query(
-        'UPDATE address_cluster_flags SET assigned_to = ?, status = "under_review", updated_at = NOW() WHERE id = ?',
+        'UPDATE address_cluster_flags SET reviewed_by = ?, reviewed_at = NOW() WHERE cluster_id = ?',
         [assignedTo, flagId]
       );
 
@@ -254,11 +279,13 @@ class AddressAnomalyDetectionService {
   async resolveFlag(flagId, resolvedBy, action, notes) {
     const connection = await pool.getConnection();
     try {
+      // For resolved flags, set reviewed_at and reviewed_by
+      // For false_positive, we can mark as reviewed but keep is_suspicious = 0
       await connection.query(
         `UPDATE address_cluster_flags 
-         SET status = ?, resolved_by = ?, resolution_notes = ?, updated_at = NOW()
-         WHERE id = ?`,
-        [action === 'approved' ? 'resolved' : 'false_positive', resolvedBy, notes, flagId]
+         SET reviewed_by = ?, reviewed_at = NOW(), is_suspicious = ?
+         WHERE cluster_id = ?`,
+        [resolvedBy, action === 'approved' ? 1 : 0, flagId]
       );
 
       return { success: true };
