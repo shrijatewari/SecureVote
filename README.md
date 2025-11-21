@@ -12,6 +12,9 @@ A **government-grade, production-ready** Election Management System with AI-powe
 - ✅ **Document Upload** with AES-256 encryption
 - ✅ **Application Tracking** with timeline
 
+  <img width="1280" height="764" alt="image" src="https://github.com/user-attachments/assets/01772d2e-6437-406f-9cc2-a2bcd79e3893" />
+
+
 ### Advanced Features
 - ✅ **AI-Powered Duplicate Detection** (6 AI microservices)
 - ✅ **Death Record Synchronization**
