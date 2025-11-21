@@ -234,18 +234,10 @@ npm test
 
 ## 📦 Deployment
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions to:
-- GitHub
-- Vercel (Frontend + Backend)
-- Database setup
-- AI services deployment
-
-## 📝 Documentation
-
-- [AI Backend Guide](./AI_BACKEND_COMPLETE.md)
-- [AI Integration Guide](./AI_INTEGRATION_GUIDE.md)
-- [Complete System Summary](./COMPLETE_SYSTEM_SUMMARY.md)
-- [Deployment Guide](./DEPLOYMENT.md)
+See deployment guides for detailed instructions:
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - General deployment guide (GitHub, Vercel, Database setup)
+- **[VERCEL_DEPLOY_INSTRUCTIONS.md](./VERCEL_DEPLOY_INSTRUCTIONS.md)** - Complete step-by-step Vercel deployment guide
+- **[backend/README.md](./backend/README.md)** - Backend setup and configuration guide
 
 ## 🛠️ Tech Stack
 
