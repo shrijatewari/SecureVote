@@ -89,6 +89,22 @@ app.use(siemMiddleware);
 // Audit logging middleware (logs all requests)
 app.use(auditLogMiddleware);
 
+// Root route - MUST be before other routes to catch GET /
+app.get('/', (req, res) => {
+  res.json({
+    message: 'SecureVote Election Management System API',
+    version: '1.0.0',
+    status: 'running',
+    endpoints: {
+      api: '/api',
+      docs: '/api-docs',
+      health: '/health',
+      healthApi: '/api/health'
+    },
+    note: 'This is the backend API server. Frontend should be accessed separately.'
+  });
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ 
@@ -191,22 +207,7 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Root route - API info
-app.get('/', (req, res) => {
-  res.json({
-    message: 'SecureVote Election Management System API',
-    version: '1.0.0',
-    status: 'running',
-    endpoints: {
-      api: '/api',
-      docs: '/api-docs',
-      health: '/api/health'
-    },
-    note: 'This is the backend API server. Frontend should be accessed separately.'
-  });
-});
-
-// Health check endpoint
+// Health check endpoint (API version)
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
