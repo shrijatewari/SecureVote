@@ -279,6 +279,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - DigiLocker and Aadhaar Portal for UI/UX reference
 - All open-source contributors
 
----
+----
 
 **Built with ❤️ for transparent and secure elections**
